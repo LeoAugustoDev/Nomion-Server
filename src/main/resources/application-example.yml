@@ -1,0 +1,15 @@
+spring:
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/nomion
+    username: postgres
+    password: SUA_SENHA_AQUI
+
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+
+  flyway:
+    enabled: true

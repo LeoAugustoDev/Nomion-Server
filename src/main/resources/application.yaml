@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: nomion-server
+
+  profiles:
+    active: dev

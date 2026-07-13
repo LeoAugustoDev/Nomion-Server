@@ -1,0 +1,4 @@
+ALTER TABLE tenant RENAME TO tenants;
+
+ALTER TABLE tenants
+    ADD COLUMN slug VARCHAR(255) NOT NULL UNIQUE;
