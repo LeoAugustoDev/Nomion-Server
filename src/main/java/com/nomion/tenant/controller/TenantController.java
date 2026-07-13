@@ -1,9 +1,10 @@
 package com.nomion.tenant.controller;
 
-import com.nomion.tenant.domain.Tenant;
 import com.nomion.tenant.dto.CreateTenantRequest;
+import com.nomion.tenant.dto.TenantResponse;
 import com.nomion.tenant.service.TenantService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,24 +24,20 @@ public class TenantController {
 
 
     @PostMapping
-    public ResponseEntity<Tenant> create(
+    public ResponseEntity<TenantResponse> create(
             @RequestBody @Valid CreateTenantRequest request
     ){
 
-        return ResponseEntity.ok(
-                service.create(request)
-        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
 
     @GetMapping("/{id}")
-    public ResponseEntity<Tenant> findById(
+    public ResponseEntity<TenantResponse> findById(
             @PathVariable UUID id
     ){
 
-        return ResponseEntity.ok(
-                service.findById(id)
-        );
+        return ResponseEntity.ok(service.findById(id));
     }
 
 }

@@ -1,8 +1,12 @@
 package com.nomion.tenant.service;
 
+import com.nomion.handler.BusinessException;
+import com.nomion.handler.ResourceNotFoundException;
 import com.nomion.tenant.domain.Tenant;
-import com.nomion.tenant.repository.TenantRepository;
 import com.nomion.tenant.dto.CreateTenantRequest;
+import com.nomion.tenant.dto.TenantResponse;
+import com.nomion.tenant.mapper.TenantMapper;
+import com.nomion.tenant.repository.TenantRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,36 +17,38 @@ public class TenantService {
 
 
     private final TenantRepository repository;
+    private final TenantMapper mapper;
 
 
-    public TenantService(TenantRepository repository) {
+    public TenantService(TenantRepository repository, TenantMapper mapper) {
         this.repository = repository;
+        this.mapper = mapper;
     }
 
 
     @Transactional
-    public Tenant create(CreateTenantRequest request){
+    public TenantResponse create(CreateTenantRequest request){
 
         if(repository.existsBySlug(request.slug())){
-            throw new RuntimeException("Slug já utilizado");
+            throw new BusinessException("Slug já utilizado");
         }
 
 
-        Tenant tenant = Tenant.builder()
-                .name(request.name())
-                .slug(request.slug())
-                .build();
+        Tenant tenant = mapper.toEntity(request);
 
 
-        return repository.save(tenant);
+        return mapper.toResponse(repository.save(tenant));
     }
 
 
-    public Tenant findById(UUID id){
+    @Transactional(readOnly = true)
+    public TenantResponse findById(UUID id){
 
-        return repository.findById(id)
+        Tenant tenant = repository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Tenant não encontrado"));
+                        new ResourceNotFoundException("Tenant não encontrado"));
+
+        return mapper.toResponse(tenant);
     }
 
 }
