@@ -1,15 +1,23 @@
 spring:
-
   datasource:
-    url: jdbc:postgresql://localhost:5432/nomion
-    username: postgres
-    password: SUA_SENHA_AQUI
-
+    url: jdbc:postgresql://localhost:5433/nomion
+    username: nomion
+    password: altere-esta-senha-local
+    driver-class-name: org.postgresql.Driver
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
 
-
   flyway:
     enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
