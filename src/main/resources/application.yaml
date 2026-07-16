@@ -3,4 +3,4 @@ spring:
     name: nomion-server
 
   profiles:
-    active: dev
+    default: dev
