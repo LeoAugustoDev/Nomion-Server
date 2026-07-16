@@ -2,23 +2,30 @@ package com.nomion.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+import java.util.UUID;
 
 public record CreateUserRequest(
 
-        @NotBlank
+        @NotBlank(message = "Nome é obrigatório")
+        @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
         String name,
 
 
-        @Email
-        @NotBlank
+        @NotBlank(message = "E-mail é obrigatório")
+        @Email(message = "E-mail inválido")
+        @Size(max = 150, message = "E-mail deve ter no máximo 150 caracteres")
         String email,
 
 
-        @NotBlank
+        @NotBlank(message = "Senha é obrigatória")
+        @Size(min = 8, max = 72, message = "Senha deve ter entre 8 e 72 caracteres")
         String password,
 
 
-        @NotBlank
-        String tenantId
+        @NotNull(message = "Tenant é obrigatório")
+        UUID tenantId
 
 ) {}
