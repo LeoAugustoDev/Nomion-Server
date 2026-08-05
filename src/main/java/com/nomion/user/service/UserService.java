@@ -29,6 +29,7 @@ public class UserService {
     private final UserRepository repository;
     private final TenantRepository tenantRepository;
     private final TenantMembershipService membershipService;
+    private final RoleAssignmentService roleAssignmentService;
     private final UserMapper mapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -37,19 +38,28 @@ public class UserService {
             UserRepository repository,
             TenantRepository tenantRepository,
             TenantMembershipService membershipService,
+            RoleAssignmentService roleAssignmentService,
             UserMapper mapper,
             PasswordEncoder passwordEncoder
     ) {
         this.repository = repository;
         this.tenantRepository = tenantRepository;
         this.membershipService = membershipService;
+        this.roleAssignmentService = roleAssignmentService;
         this.mapper = mapper;
         this.passwordEncoder = passwordEncoder;
     }
 
 
     @Transactional
-    public UserResponse create(CreateUserRequest request) {
+    public UserResponse create(
+            CreateUserRequest request,
+            AuthenticatedUser authenticatedUser
+    ) {
+
+        if (authenticatedUser == null) {
+            throw new UnauthorizedException("Autenticação necessária");
+        }
 
         String email = normalizeEmail(request.email());
 
@@ -58,7 +68,7 @@ public class UserService {
         }
 
 
-        Tenant tenant = tenantRepository.findById(request.tenantId())
+        Tenant tenant = tenantRepository.findById(authenticatedUser.tenantId())
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Tenant não encontrado"));
 
@@ -78,6 +88,13 @@ public class UserService {
         }
 
         TenantMembership membership = membershipService.create(savedUser, tenant);
+        User assignedBy = repository.getReferenceById(authenticatedUser.id());
+
+        roleAssignmentService.assignTenantRoles(
+                membership,
+                request.roles(),
+                assignedBy
+        );
 
         return mapper.toResponse(savedUser, List.of(membership));
     }

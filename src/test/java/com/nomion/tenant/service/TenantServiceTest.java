@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -71,7 +72,9 @@ class TenantServiceTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 tenantId,
-                "admin@nomion.com"
+                "admin@nomion.com",
+                Set.of("TENANT_ADMIN"),
+                Set.of("TENANT_READ")
         );
     }
 }

@@ -13,6 +13,8 @@ import com.nomion.auth.repository.RefreshTokenRepository;
 import com.nomion.auth.repository.TenantSelectionTokenRepository;
 import com.nomion.handler.UnauthorizedException;
 import com.nomion.security.AuthenticatedUser;
+import com.nomion.security.AuthorizationContext;
+import com.nomion.security.AuthorizationService;
 import com.nomion.security.JwtService;
 import com.nomion.security.TenantSelectionPrincipal;
 import com.nomion.tenant.domain.Tenant;
@@ -39,6 +41,7 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -69,6 +72,9 @@ class AuthServiceTest {
 
     @Mock
     private TenantMembershipMapper membershipMapper;
+
+    @Mock
+    private AuthorizationService authorizationService;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -271,7 +277,9 @@ class AuthServiceTest {
                 user.getId(),
                 currentMembership.getId(),
                 currentMembership.getTenant().getId(),
-                user.getEmail()
+                user.getEmail(),
+                Set.of("TENANT_ADMIN"),
+                Set.of("TENANT_READ")
         );
 
         when(refreshTokenRepository.findByTokenHashAndRevokedAtIsNull(
@@ -331,7 +339,15 @@ class AuthServiceTest {
             String accessToken
     ) {
 
-        when(jwtService.generateAccessToken(user, membership)).thenReturn(accessToken);
+        AuthorizationContext authorizationContext = new AuthorizationContext(
+                Set.of("TENANT_ADMIN"),
+                Set.of("TENANT_READ", "USER_READ")
+        );
+
+        when(authorizationService.load(user.getId(), membership.getId()))
+                .thenReturn(authorizationContext);
+        when(jwtService.generateAccessToken(user, membership, authorizationContext))
+                .thenReturn(accessToken);
         when(jwtService.getAccessTokenExpiration()).thenReturn(Duration.ofMinutes(15));
         when(jwtService.getRefreshTokenExpiration()).thenReturn(Duration.ofDays(7));
         when(membershipMapper.toResponse(membership)).thenReturn(membershipResponse);

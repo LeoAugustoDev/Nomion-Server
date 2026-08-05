@@ -1,0 +1,14 @@
+package com.nomion.user.domain;
+
+public enum PermissionCode {
+
+    TENANT_CREATE,
+    TENANT_READ,
+    USER_CREATE,
+    USER_READ,
+    MEMBERSHIP_CREATE,
+    MEMBERSHIP_READ,
+    MEMBERSHIP_UPDATE,
+    ROLE_ASSIGN
+
+}

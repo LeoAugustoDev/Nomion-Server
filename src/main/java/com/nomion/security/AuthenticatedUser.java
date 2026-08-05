@@ -1,6 +1,7 @@
 package com.nomion.security;
 
 import java.util.UUID;
+import java.util.Set;
 
 public record AuthenticatedUser(
 
@@ -10,7 +11,11 @@ public record AuthenticatedUser(
 
         UUID tenantId,
 
-        String email
+        String email,
+
+        Set<String> roles,
+
+        Set<String> permissions
 
 ) {
 }

@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -26,6 +27,7 @@ public class TenantController {
 
 
     @PostMapping
+    @PreAuthorize("hasAuthority('TENANT_CREATE')")
     public ResponseEntity<TenantResponse> create(
             @RequestBody @Valid CreateTenantRequest request
     ){
@@ -35,6 +37,7 @@ public class TenantController {
 
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('TENANT_READ')")
     public ResponseEntity<TenantResponse> findById(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable UUID id
