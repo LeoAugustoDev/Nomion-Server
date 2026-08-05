@@ -1,5 +1,7 @@
 package com.nomion.auth.dto;
 
+import com.nomion.tenant.dto.TenantMembershipResponse;
+
 public record TokenResponse(
 
         String accessToken,
@@ -8,7 +10,9 @@ public record TokenResponse(
 
         String tokenType,
 
-        long expiresIn
+        long expiresIn,
+
+        TenantMembershipResponse tenant
 
 ) {
 }

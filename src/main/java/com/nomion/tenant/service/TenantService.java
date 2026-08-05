@@ -2,6 +2,8 @@ package com.nomion.tenant.service;
 
 import com.nomion.handler.BusinessException;
 import com.nomion.handler.ResourceNotFoundException;
+import com.nomion.handler.UnauthorizedException;
+import com.nomion.security.AuthenticatedUser;
 import com.nomion.tenant.domain.Tenant;
 import com.nomion.tenant.dto.CreateTenantRequest;
 import com.nomion.tenant.dto.TenantResponse;
@@ -42,7 +44,15 @@ public class TenantService {
 
 
     @Transactional(readOnly = true)
-    public TenantResponse findById(UUID id){
+    public TenantResponse findById(UUID id, AuthenticatedUser authenticatedUser){
+
+        if (authenticatedUser == null) {
+            throw new UnauthorizedException("Autenticação necessária");
+        }
+
+        if (!id.equals(authenticatedUser.tenantId())) {
+            throw new ResourceNotFoundException("Tenant não encontrado");
+        }
 
         Tenant tenant = repository.findById(id)
                 .orElseThrow(() ->

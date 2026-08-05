@@ -1,5 +1,8 @@
 package com.nomion.user.dto;
 
+import com.nomion.tenant.dto.TenantMembershipResponse;
+
+import java.util.List;
 import java.util.UUID;
 
 public record UserResponse(
@@ -10,7 +13,7 @@ public record UserResponse(
 
         String email,
 
-        UUID tenantId
+        List<TenantMembershipResponse> memberships
 
 ) {
 }

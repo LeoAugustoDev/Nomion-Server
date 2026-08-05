@@ -5,6 +5,7 @@ import com.nomion.security.RestAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -33,7 +34,18 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/auth/**",
+                                HttpMethod.POST,
+                                "/auth/login",
+                                "/auth/select-tenant",
+                                "/auth/refresh",
+                                "/auth/logout"
+                        ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/tenants",
+                                "/users"
+                        ).denyAll()
+                        .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/health",

@@ -2,17 +2,23 @@ package com.nomion.user.service;
 
 import com.nomion.handler.BusinessException;
 import com.nomion.handler.ResourceNotFoundException;
+import com.nomion.handler.UnauthorizedException;
+import com.nomion.security.AuthenticatedUser;
 import com.nomion.tenant.domain.Tenant;
+import com.nomion.tenant.domain.TenantMembership;
 import com.nomion.tenant.repository.TenantRepository;
+import com.nomion.tenant.service.TenantMembershipService;
 import com.nomion.user.domain.User;
 import com.nomion.user.dto.CreateUserRequest;
 import com.nomion.user.dto.UserResponse;
 import com.nomion.user.mapper.UserMapper;
 import com.nomion.user.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -22,6 +28,7 @@ public class UserService {
 
     private final UserRepository repository;
     private final TenantRepository tenantRepository;
+    private final TenantMembershipService membershipService;
     private final UserMapper mapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -29,11 +36,13 @@ public class UserService {
     public UserService(
             UserRepository repository,
             TenantRepository tenantRepository,
+            TenantMembershipService membershipService,
             UserMapper mapper,
             PasswordEncoder passwordEncoder
     ) {
         this.repository = repository;
         this.tenantRepository = tenantRepository;
+        this.membershipService = membershipService;
         this.mapper = mapper;
         this.passwordEncoder = passwordEncoder;
     }
@@ -57,23 +66,42 @@ public class UserService {
         User user = mapper.toEntity(
                 request.name().trim(),
                 email,
-                passwordEncoder.encode(request.password()),
-                tenant
+                passwordEncoder.encode(request.password())
         );
 
+        User savedUser;
 
-        return mapper.toResponse(repository.save(user));
+        try {
+            savedUser = repository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException exception) {
+            throw new BusinessException("E-mail já utilizado");
+        }
+
+        TenantMembership membership = membershipService.create(savedUser, tenant);
+
+        return mapper.toResponse(savedUser, List.of(membership));
     }
 
 
     @Transactional(readOnly = true)
-    public UserResponse findById(UUID id) {
+    public UserResponse findById(UUID id, AuthenticatedUser authenticatedUser) {
+
+        if (authenticatedUser == null) {
+            throw new UnauthorizedException("Autenticação necessária");
+        }
 
         User user = repository.findById(id)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Usuário não encontrado"));
 
-        return mapper.toResponse(user);
+        TenantMembership membership = membershipService.findActive(
+                        id,
+                        authenticatedUser.tenantId()
+                )
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Usuário não encontrado"));
+
+        return mapper.toResponse(user, List.of(membership));
     }
 
 
