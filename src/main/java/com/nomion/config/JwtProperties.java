@@ -18,7 +18,10 @@ public record JwtProperties(
         Duration accessTokenExpiration,
 
         @NotNull
-        Duration refreshTokenExpiration
+        Duration refreshTokenExpiration,
+
+        @NotNull
+        Duration tenantSelectionTokenExpiration
 
 ) {
 }

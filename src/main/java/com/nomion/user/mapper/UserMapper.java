@@ -1,36 +1,51 @@
 package com.nomion.user.mapper;
 
-import com.nomion.tenant.domain.Tenant;
+import com.nomion.tenant.domain.TenantMembership;
+import com.nomion.tenant.mapper.TenantMembershipMapper;
 import com.nomion.user.domain.User;
 import com.nomion.user.dto.UserResponse;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class UserMapper {
+
+
+    private final TenantMembershipMapper membershipMapper;
+
+
+    public UserMapper(TenantMembershipMapper membershipMapper) {
+        this.membershipMapper = membershipMapper;
+    }
+
 
     public User toEntity(
             String name,
             String email,
-            String encodedPassword,
-            Tenant tenant
+            String encodedPassword
     ) {
 
         return User.builder()
                 .name(name)
                 .email(email)
                 .password(encodedPassword)
-                .tenant(tenant)
                 .build();
     }
 
 
-    public UserResponse toResponse(User user) {
+    public UserResponse toResponse(
+            User user,
+            List<TenantMembership> memberships
+    ) {
 
         return new UserResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getTenant().getId()
+                memberships.stream()
+                        .map(membershipMapper::toResponse)
+                        .toList()
         );
     }
 }

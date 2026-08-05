@@ -1,6 +1,18 @@
+spring:
+  jpa:
+    properties:
+      hibernate:
+        default_schema: nomion_test
+
+  flyway:
+    create-schemas: true
+    default-schema: nomion_test
+    schemas: nomion_test
+
 nomion:
   security:
     jwt:
       secret: c2VjdXJlLXRlc3Qta2V5LWZvci1ub21pb24td2l0aC1hdC1sZWFzdC0zMi1ieXRlcw==
       access-token-expiration: 15m
       refresh-token-expiration: 7d
+      tenant-selection-token-expiration: 5m

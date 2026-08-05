@@ -14,3 +14,4 @@ nomion:
       secret: ${JWT_SECRET}
       access-token-expiration: 15m
       refresh-token-expiration: 7d
+      tenant-selection-token-expiration: 5m

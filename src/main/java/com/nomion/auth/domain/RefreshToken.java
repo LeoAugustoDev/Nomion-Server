@@ -1,6 +1,6 @@
 package com.nomion.auth.domain;
 
-import com.nomion.user.domain.User;
+import com.nomion.tenant.domain.TenantMembership;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,8 +23,8 @@ public class RefreshToken {
 
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @JoinColumn(name = "membership_id", nullable = false)
+    private TenantMembership membership;
 
 
     @Column(name = "token_hash", nullable = false, unique = true, length = 64)
@@ -41,6 +41,11 @@ public class RefreshToken {
 
     @Column(name = "revoked_at")
     private Instant revokedAt;
+
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
 
     @PrePersist

@@ -1,14 +1,26 @@
 package com.nomion.auth.service;
 
 import com.nomion.auth.domain.RefreshToken;
+import com.nomion.auth.domain.TenantSelectionToken;
 import com.nomion.auth.dto.LoginRequest;
+import com.nomion.auth.dto.LoginResponse;
+import com.nomion.auth.dto.LoginStatus;
 import com.nomion.auth.dto.RefreshTokenRequest;
+import com.nomion.auth.dto.SelectTenantRequest;
+import com.nomion.auth.dto.SwitchTenantRequest;
 import com.nomion.auth.dto.TokenResponse;
 import com.nomion.auth.repository.RefreshTokenRepository;
+import com.nomion.auth.repository.TenantSelectionTokenRepository;
 import com.nomion.handler.UnauthorizedException;
+import com.nomion.security.AuthenticatedUser;
 import com.nomion.security.JwtService;
+import com.nomion.security.TenantSelectionPrincipal;
+import com.nomion.tenant.domain.TenantMembership;
+import com.nomion.tenant.mapper.TenantMembershipMapper;
+import com.nomion.tenant.service.TenantMembershipService;
 import com.nomion.user.domain.User;
 import com.nomion.user.repository.UserRepository;
+import io.jsonwebtoken.JwtException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +32,9 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -30,6 +44,9 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final TenantSelectionTokenRepository selectionTokenRepository;
+    private final TenantMembershipService membershipService;
+    private final TenantMembershipMapper membershipMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -37,18 +54,24 @@ public class AuthService {
     public AuthService(
             UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
+            TenantSelectionTokenRepository selectionTokenRepository,
+            TenantMembershipService membershipService,
+            TenantMembershipMapper membershipMapper,
             PasswordEncoder passwordEncoder,
             JwtService jwtService
     ) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.selectionTokenRepository = selectionTokenRepository;
+        this.membershipService = membershipService;
+        this.membershipMapper = membershipMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
 
 
     @Transactional
-    public TokenResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmailIgnoreCase(normalizeEmail(request.email()))
                 .orElseThrow(() ->
@@ -58,25 +81,113 @@ public class AuthService {
             throw new UnauthorizedException("E-mail ou senha inválidos");
         }
 
-        return issueTokens(user);
+        List<TenantMembership> memberships = membershipService.findActiveByUser(user.getId());
+
+        if (memberships.isEmpty()) {
+            throw new UnauthorizedException("Usuário não possui acesso ativo a nenhum tenant");
+        }
+
+        if (memberships.size() == 1) {
+            TenantMembership membership = memberships.getFirst();
+
+            return new LoginResponse(
+                    LoginStatus.AUTHENTICATED,
+                    issueTokens(user, membership),
+                    null,
+                    0,
+                    List.of(membershipMapper.toResponse(membership))
+            );
+        }
+
+        UUID selectionTokenId = UUID.randomUUID();
+
+        selectionTokenRepository.save(TenantSelectionToken.builder()
+                .id(selectionTokenId)
+                .user(user)
+                .expiresAt(Instant.now().plus(
+                        jwtService.getTenantSelectionTokenExpiration()
+                ))
+                .build());
+
+        return new LoginResponse(
+                LoginStatus.TENANT_SELECTION_REQUIRED,
+                null,
+                jwtService.generateTenantSelectionToken(user, selectionTokenId),
+                jwtService.getTenantSelectionTokenExpiration().toSeconds(),
+                memberships.stream()
+                        .map(membershipMapper::toResponse)
+                        .toList()
+        );
+    }
+
+
+    @Transactional
+    public TokenResponse selectTenant(SelectTenantRequest request) {
+
+        TenantSelectionPrincipal principal = extractTenantSelectionPrincipal(
+                request.tenantSelectionToken()
+        );
+
+        TenantSelectionToken selectionToken = selectionTokenRepository
+                .findByIdAndConsumedAtIsNull(principal.tokenId())
+                .orElseThrow(() ->
+                        new UnauthorizedException("Token de seleção inválido"));
+
+        if (!selectionToken.getUser().getId().equals(principal.userId())
+                || !selectionToken.getExpiresAt().isAfter(Instant.now())) {
+            throw new UnauthorizedException("Token de seleção inválido ou expirado");
+        }
+
+        TenantMembership membership = findActiveMembership(
+                principal.userId(),
+                request.tenantId()
+        );
+
+        selectionToken.setConsumedAt(Instant.now());
+
+        return issueTokens(selectionToken.getUser(), membership);
     }
 
 
     @Transactional
     public TokenResponse refresh(RefreshTokenRequest request) {
 
-        RefreshToken refreshToken = refreshTokenRepository
-                .findByTokenHashAndRevokedAtIsNull(hashToken(request.refreshToken()))
-                .orElseThrow(() ->
-                        new UnauthorizedException("Refresh token inválido"));
-
-        if (!refreshToken.getExpiresAt().isAfter(Instant.now())) {
-            throw new UnauthorizedException("Refresh token expirado");
-        }
+        RefreshToken refreshToken = findValidRefreshToken(request.refreshToken());
+        TenantMembership membership = validateActiveMembership(refreshToken);
 
         refreshToken.setRevokedAt(Instant.now());
 
-        return issueTokens(refreshToken.getUser());
+        return issueTokens(membership.getUser(), membership);
+    }
+
+
+    @Transactional
+    public TokenResponse switchTenant(
+            AuthenticatedUser authenticatedUser,
+            SwitchTenantRequest request
+    ) {
+
+        if (authenticatedUser == null) {
+            throw new UnauthorizedException("Autenticação necessária");
+        }
+
+        RefreshToken refreshToken = findValidRefreshToken(request.refreshToken());
+        TenantMembership currentMembership = validateActiveMembership(refreshToken);
+
+        if (!currentMembership.getUser().getId().equals(authenticatedUser.id())
+                || !currentMembership.getId().equals(authenticatedUser.membershipId())
+                || !currentMembership.getTenant().getId().equals(authenticatedUser.tenantId())) {
+            throw new UnauthorizedException("Refresh token não pertence à sessão atual");
+        }
+
+        TenantMembership targetMembership = findActiveMembership(
+                authenticatedUser.id(),
+                request.tenantId()
+        );
+
+        refreshToken.setRevokedAt(Instant.now());
+
+        return issueTokens(currentMembership.getUser(), targetMembership);
     }
 
 
@@ -89,22 +200,76 @@ public class AuthService {
     }
 
 
-    private TokenResponse issueTokens(User user) {
+    private TokenResponse issueTokens(
+            User user,
+            TenantMembership membership
+    ) {
 
         String refreshTokenValue = generateRefreshToken();
 
         refreshTokenRepository.save(RefreshToken.builder()
-                .user(user)
+                .membership(membership)
                 .tokenHash(hashToken(refreshTokenValue))
                 .expiresAt(Instant.now().plus(jwtService.getRefreshTokenExpiration()))
                 .build());
 
         return new TokenResponse(
-                jwtService.generateAccessToken(user),
+                jwtService.generateAccessToken(user, membership),
                 refreshTokenValue,
                 "Bearer",
-                jwtService.getAccessTokenExpiration().toSeconds()
+                jwtService.getAccessTokenExpiration().toSeconds(),
+                membershipMapper.toResponse(membership)
         );
+    }
+
+
+    private RefreshToken findValidRefreshToken(String token) {
+
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByTokenHashAndRevokedAtIsNull(hashToken(token))
+                .orElseThrow(() ->
+                        new UnauthorizedException("Refresh token inválido"));
+
+        if (!refreshToken.getExpiresAt().isAfter(Instant.now())) {
+            throw new UnauthorizedException("Refresh token expirado");
+        }
+
+        return refreshToken;
+    }
+
+
+    private TenantMembership findActiveMembership(UUID userId, UUID tenantId) {
+
+        return membershipService.findActive(userId, tenantId)
+                .orElseThrow(() ->
+                        new UnauthorizedException("Usuário não possui acesso ativo ao tenant"));
+    }
+
+
+    private TenantMembership validateActiveMembership(RefreshToken refreshToken) {
+
+        TenantMembership tokenMembership = refreshToken.getMembership();
+
+        TenantMembership activeMembership = findActiveMembership(
+                tokenMembership.getUser().getId(),
+                tokenMembership.getTenant().getId()
+        );
+
+        if (!activeMembership.getId().equals(tokenMembership.getId())) {
+            throw new UnauthorizedException("Refresh token não pertence ao vínculo ativo");
+        }
+
+        return activeMembership;
+    }
+
+
+    private TenantSelectionPrincipal extractTenantSelectionPrincipal(String token) {
+
+        try {
+            return jwtService.extractTenantSelectionPrincipal(token);
+        } catch (JwtException | IllegalArgumentException exception) {
+            throw new UnauthorizedException("Token de seleção inválido");
+        }
     }
 
 

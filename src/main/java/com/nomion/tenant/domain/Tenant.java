@@ -1,11 +1,9 @@
 package com.nomion.tenant.domain;
 
-import com.nomion.user.domain.User;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -29,12 +27,6 @@ public class Tenant {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
-
-    @OneToMany(
-            mappedBy = "tenant",
-            cascade = CascadeType.ALL
-    )
-    private List<User> users;
 
     @PrePersist
     public void prePersist() {

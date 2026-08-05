@@ -1,6 +1,5 @@
 package com.nomion.user.domain;
 
-import com.nomion.tenant.domain.Tenant;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -31,10 +30,5 @@ public class User {
 
     @Column(nullable = false)
     private String password;
-
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tenant_id", nullable = false)
-    private Tenant tenant;
 
 }
