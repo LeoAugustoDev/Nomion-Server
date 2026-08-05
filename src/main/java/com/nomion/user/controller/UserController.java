@@ -7,6 +7,7 @@ import com.nomion.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,15 +27,20 @@ public class UserController {
 
 
     @PostMapping
+    @PreAuthorize("hasAuthority('USER_CREATE') and hasAuthority('ROLE_ASSIGN')")
     public ResponseEntity<UserResponse> create(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestBody @Valid CreateUserRequest request
     ) {
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                service.create(request, authenticatedUser)
+        );
     }
 
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('USER_READ')")
     public ResponseEntity<UserResponse> findById(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable UUID id

@@ -9,6 +9,7 @@ import com.nomion.tenant.domain.TenantMembershipStatus;
 import com.nomion.tenant.dto.TenantMembershipResponse;
 import com.nomion.tenant.repository.TenantRepository;
 import com.nomion.tenant.service.TenantMembershipService;
+import com.nomion.user.domain.RoleCode;
 import com.nomion.user.domain.User;
 import com.nomion.user.dto.CreateUserRequest;
 import com.nomion.user.dto.UserResponse;
@@ -23,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,6 +48,9 @@ class UserServiceTest {
     private TenantMembershipService membershipService;
 
     @Mock
+    private RoleAssignmentService roleAssignmentService;
+
+    @Mock
     private UserMapper mapper;
 
     @Mock
@@ -66,8 +71,11 @@ class UserServiceTest {
                 "Leonardo Alves",
                 "LEONARDO@NOMION.COM",
                 "senha-segura",
-                tenantId
+                Set.of(RoleCode.VIEWER)
         );
+
+        AuthenticatedUser authenticatedUser = authenticatedUser(tenantId);
+        User assignedBy = User.builder().id(authenticatedUser.id()).build();
 
         Tenant tenant = Tenant.builder()
                 .id(tenantId)
@@ -112,15 +120,21 @@ class UserServiceTest {
         )).thenReturn(user);
         when(repository.saveAndFlush(user)).thenReturn(user);
         when(membershipService.create(user, tenant)).thenReturn(membership);
+        when(repository.getReferenceById(authenticatedUser.id())).thenReturn(assignedBy);
         when(mapper.toResponse(user, List.of(membership))).thenReturn(response);
 
-        UserResponse result = service.create(request);
+        UserResponse result = service.create(request, authenticatedUser);
 
         assertEquals(response, result);
 
         verify(passwordEncoder).encode("senha-segura");
         verify(repository).saveAndFlush(user);
         verify(membershipService).create(user, tenant);
+        verify(roleAssignmentService).assignTenantRoles(
+                membership,
+                Set.of(RoleCode.VIEWER),
+                assignedBy
+        );
     }
 
 
@@ -136,12 +150,7 @@ class UserServiceTest {
                 .tenant(Tenant.builder().id(tenantId).build())
                 .build();
         UserResponse response = new UserResponse(userId, "Leonardo", "email@nomion.com", List.of());
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                tenantId,
-                "admin@nomion.com"
-        );
+        AuthenticatedUser authenticatedUser = authenticatedUser(tenantId);
 
         when(repository.findById(userId)).thenReturn(Optional.of(user));
         when(membershipService.findActive(userId, tenantId)).thenReturn(Optional.of(membership));
@@ -159,12 +168,7 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         User user = User.builder().id(userId).build();
-        AuthenticatedUser authenticatedUser = new AuthenticatedUser(
-                UUID.randomUUID(),
-                UUID.randomUUID(),
-                tenantId,
-                "admin@nomion.com"
-        );
+        AuthenticatedUser authenticatedUser = authenticatedUser(tenantId);
 
         when(repository.findById(userId)).thenReturn(Optional.of(user));
         when(membershipService.findActive(userId, tenantId)).thenReturn(Optional.empty());
@@ -183,12 +187,15 @@ class UserServiceTest {
                 "Leonardo Alves",
                 "leonardo@nomion.com",
                 "senha-segura",
-                UUID.randomUUID()
+                Set.of(RoleCode.VIEWER)
         );
+
+        AuthenticatedUser authenticatedUser = authenticatedUser(UUID.randomUUID());
 
         when(repository.existsByEmailIgnoreCase("leonardo@nomion.com")).thenReturn(true);
 
-        assertThrows(BusinessException.class, () -> service.create(request));
+        assertThrows(BusinessException.class, () ->
+                service.create(request, authenticatedUser));
 
         verify(tenantRepository, never()).findById(any());
         verify(repository, never()).saveAndFlush(any());
@@ -204,15 +211,31 @@ class UserServiceTest {
                 "Leonardo Alves",
                 "leonardo@nomion.com",
                 "senha-segura",
-                tenantId
+                Set.of(RoleCode.VIEWER)
         );
+
+        AuthenticatedUser authenticatedUser = authenticatedUser(tenantId);
 
         when(repository.existsByEmailIgnoreCase("leonardo@nomion.com")).thenReturn(false);
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> service.create(request));
+        assertThrows(ResourceNotFoundException.class, () ->
+                service.create(request, authenticatedUser));
 
         verify(repository, never()).saveAndFlush(any());
         verify(membershipService, never()).create(any(), any());
+    }
+
+
+    private AuthenticatedUser authenticatedUser(UUID tenantId) {
+
+        return new AuthenticatedUser(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                tenantId,
+                "admin@nomion.com",
+                Set.of(RoleCode.TENANT_ADMIN.name()),
+                Set.of("USER_CREATE", "USER_READ", "ROLE_ASSIGN")
+        );
     }
 }

@@ -13,8 +13,12 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Date;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class JwtService {
@@ -44,7 +48,11 @@ public class JwtService {
     }
 
 
-    public String generateAccessToken(User user, TenantMembership membership) {
+    public String generateAccessToken(
+            User user,
+            TenantMembership membership,
+            AuthorizationContext authorizationContext
+    ) {
 
         Instant issuedAt = Instant.now();
 
@@ -54,6 +62,8 @@ public class JwtService {
                 .claim("membershipId", membership.getId().toString())
                 .claim("tenantId", membership.getTenant().getId().toString())
                 .claim("email", user.getEmail())
+                .claim("roles", new TreeSet<>(authorizationContext.roles()))
+                .claim("permissions", new TreeSet<>(authorizationContext.permissions()))
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(issuedAt.plus(accessTokenExpiration)))
                 .signWith(signingKey)
@@ -86,7 +96,9 @@ public class JwtService {
                 UUID.fromString(claims.getSubject()),
                 UUID.fromString(claims.get("membershipId", String.class)),
                 UUID.fromString(claims.get("tenantId", String.class)),
-                claims.get("email", String.class)
+                claims.get("email", String.class),
+                extractStringSet(claims, "roles"),
+                extractStringSet(claims, "permissions")
         );
     }
 
@@ -134,5 +146,19 @@ public class JwtService {
         if (!expectedType.equals(claims.get("tokenType", String.class))) {
             throw new JwtException("Tipo de token inválido");
         }
+    }
+
+
+    private Set<String> extractStringSet(Claims claims, String claimName) {
+
+        Object value = claims.get(claimName);
+
+        if (!(value instanceof Collection<?> collection)) {
+            throw new JwtException("Claim de autorização inválida");
+        }
+
+        return collection.stream()
+                .map(Object::toString)
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

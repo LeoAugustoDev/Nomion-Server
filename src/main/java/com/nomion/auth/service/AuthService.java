@@ -13,6 +13,8 @@ import com.nomion.auth.repository.RefreshTokenRepository;
 import com.nomion.auth.repository.TenantSelectionTokenRepository;
 import com.nomion.handler.UnauthorizedException;
 import com.nomion.security.AuthenticatedUser;
+import com.nomion.security.AuthorizationContext;
+import com.nomion.security.AuthorizationService;
 import com.nomion.security.JwtService;
 import com.nomion.security.TenantSelectionPrincipal;
 import com.nomion.tenant.domain.TenantMembership;
@@ -47,6 +49,7 @@ public class AuthService {
     private final TenantSelectionTokenRepository selectionTokenRepository;
     private final TenantMembershipService membershipService;
     private final TenantMembershipMapper membershipMapper;
+    private final AuthorizationService authorizationService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -57,6 +60,7 @@ public class AuthService {
             TenantSelectionTokenRepository selectionTokenRepository,
             TenantMembershipService membershipService,
             TenantMembershipMapper membershipMapper,
+            AuthorizationService authorizationService,
             PasswordEncoder passwordEncoder,
             JwtService jwtService
     ) {
@@ -65,6 +69,7 @@ public class AuthService {
         this.selectionTokenRepository = selectionTokenRepository;
         this.membershipService = membershipService;
         this.membershipMapper = membershipMapper;
+        this.authorizationService = authorizationService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -206,6 +211,10 @@ public class AuthService {
     ) {
 
         String refreshTokenValue = generateRefreshToken();
+        AuthorizationContext authorizationContext = authorizationService.load(
+                user.getId(),
+                membership.getId()
+        );
 
         refreshTokenRepository.save(RefreshToken.builder()
                 .membership(membership)
@@ -214,11 +223,13 @@ public class AuthService {
                 .build());
 
         return new TokenResponse(
-                jwtService.generateAccessToken(user, membership),
+                jwtService.generateAccessToken(user, membership, authorizationContext),
                 refreshTokenValue,
                 "Bearer",
                 jwtService.getAccessTokenExpiration().toSeconds(),
-                membershipMapper.toResponse(membership)
+                membershipMapper.toResponse(membership),
+                authorizationContext.roles(),
+                authorizationContext.permissions()
         );
     }
 

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,7 +43,16 @@ class JwtServiceTest {
                 .tenant(Tenant.builder().id(tenantId).build())
                 .build();
 
-        String token = service.generateAccessToken(user, membership);
+        AuthorizationContext authorizationContext = new AuthorizationContext(
+                Set.of("TENANT_ADMIN"),
+                Set.of("TENANT_READ", "USER_READ")
+        );
+
+        String token = service.generateAccessToken(
+                user,
+                membership,
+                authorizationContext
+        );
 
         AuthenticatedUser authenticatedUser = service.extractAuthenticatedUser(token);
 
@@ -50,6 +60,11 @@ class JwtServiceTest {
         assertEquals(membershipId, authenticatedUser.membershipId());
         assertEquals(tenantId, authenticatedUser.tenantId());
         assertEquals("leonardo@nomion.com", authenticatedUser.email());
+        assertEquals(Set.of("TENANT_ADMIN"), authenticatedUser.roles());
+        assertEquals(
+                Set.of("TENANT_READ", "USER_READ"),
+                authenticatedUser.permissions()
+        );
     }
 
 

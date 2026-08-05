@@ -9,6 +9,7 @@ import com.nomion.tenant.dto.CreateTenantRequest;
 import com.nomion.tenant.dto.TenantResponse;
 import com.nomion.tenant.mapper.TenantMapper;
 import com.nomion.tenant.repository.TenantRepository;
+import com.nomion.user.domain.RoleCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,7 +51,8 @@ public class TenantService {
             throw new UnauthorizedException("Autenticação necessária");
         }
 
-        if (!id.equals(authenticatedUser.tenantId())) {
+        if (!authenticatedUser.roles().contains(RoleCode.PLATFORM_ADMIN.name())
+                && !id.equals(authenticatedUser.tenantId())) {
             throw new ResourceNotFoundException("Tenant não encontrado");
         }
 
