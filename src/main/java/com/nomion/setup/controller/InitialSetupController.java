@@ -3,6 +3,7 @@ package com.nomion.setup.controller;
 import com.nomion.setup.dto.InitialSetupRequest;
 import com.nomion.setup.dto.InitialSetupResponse;
 import com.nomion.setup.service.InitialSetupService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,7 @@ public class InitialSetupController {
 
 
     @PostMapping("/initialize")
+    @SecurityRequirements
     public ResponseEntity<InitialSetupResponse> initialize(
             @RequestHeader(value = "X-Setup-Token", required = false)
             String setupToken,

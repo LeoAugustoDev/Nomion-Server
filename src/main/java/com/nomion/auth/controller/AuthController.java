@@ -8,6 +8,7 @@ import com.nomion.auth.dto.SwitchTenantRequest;
 import com.nomion.auth.dto.TokenResponse;
 import com.nomion.auth.service.AuthService;
 import com.nomion.security.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,6 +28,7 @@ public class AuthController {
 
 
     @PostMapping("/login")
+    @SecurityRequirements
     public ResponseEntity<LoginResponse> login(
             @RequestBody @Valid LoginRequest request
     ) {
@@ -36,6 +38,7 @@ public class AuthController {
 
 
     @PostMapping("/select-tenant")
+    @SecurityRequirements
     public ResponseEntity<TokenResponse> selectTenant(
             @RequestBody @Valid SelectTenantRequest request
     ) {
@@ -45,6 +48,7 @@ public class AuthController {
 
 
     @PostMapping("/refresh")
+    @SecurityRequirements
     public ResponseEntity<TokenResponse> refresh(
             @RequestBody @Valid RefreshTokenRequest request
     ) {
@@ -64,6 +68,7 @@ public class AuthController {
 
 
     @PostMapping("/logout")
+    @SecurityRequirements
     public ResponseEntity<Void> logout(
             @RequestBody @Valid RefreshTokenRequest request
     ) {
