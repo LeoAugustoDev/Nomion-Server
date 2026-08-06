@@ -3,6 +3,7 @@ package com.nomion.user.mapper;
 import com.nomion.tenant.domain.TenantMembership;
 import com.nomion.tenant.mapper.TenantMembershipMapper;
 import com.nomion.user.domain.User;
+import com.nomion.user.dto.UserInfoResponse;
 import com.nomion.user.dto.UserResponse;
 import org.springframework.stereotype.Component;
 
@@ -46,6 +47,16 @@ public class UserMapper {
                 memberships.stream()
                         .map(membershipMapper::toResponse)
                         .toList()
+        );
+    }
+
+
+    public UserInfoResponse toInfo(User user) {
+
+        return new UserInfoResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail()
         );
     }
 }

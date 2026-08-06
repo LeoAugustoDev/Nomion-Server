@@ -24,6 +24,8 @@ import com.nomion.tenant.dto.TenantMembershipResponse;
 import com.nomion.tenant.mapper.TenantMembershipMapper;
 import com.nomion.tenant.service.TenantMembershipService;
 import com.nomion.user.domain.User;
+import com.nomion.user.dto.UserInfoResponse;
+import com.nomion.user.mapper.UserMapper;
 import com.nomion.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -77,6 +79,9 @@ class AuthServiceTest {
     private AuthorizationService authorizationService;
 
     @Mock
+    private UserMapper userMapper;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -90,6 +95,7 @@ class AuthServiceTest {
     void shouldAuthenticateDirectlyWhenUserHasOneTenant() {
 
         User user = createUser();
+        UserInfoResponse userInfo = createUserInfo(user);
         TenantMembership membership = createMembership(user, "tenant-a");
         TenantMembershipResponse membershipResponse = createMembershipResponse(membership);
 
@@ -98,6 +104,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("senha-segura", "encoded-password")).thenReturn(true);
         when(membershipService.findActiveByUser(user.getId()))
                 .thenReturn(List.of(membership));
+        when(userMapper.toInfo(user)).thenReturn(userInfo);
         mockTokenIssuance(user, membership, membershipResponse, "access-token");
 
         LoginResponse response = service.login(new LoginRequest(
@@ -106,6 +113,7 @@ class AuthServiceTest {
         ));
 
         assertEquals(LoginStatus.AUTHENTICATED, response.status());
+        assertEquals(userInfo, response.user());
         assertNotNull(response.tokens());
         assertNull(response.tenantSelectionToken());
         assertEquals(List.of(membershipResponse), response.tenants());
@@ -129,6 +137,7 @@ class AuthServiceTest {
     void shouldRequestTenantSelectionWhenUserHasMultipleTenants() {
 
         User user = createUser();
+        UserInfoResponse userInfo = createUserInfo(user);
         TenantMembership firstMembership = createMembership(user, "tenant-a");
         TenantMembership secondMembership = createMembership(user, "tenant-b");
         TenantMembershipResponse firstResponse = createMembershipResponse(firstMembership);
@@ -139,6 +148,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("senha-segura", "encoded-password")).thenReturn(true);
         when(membershipService.findActiveByUser(user.getId()))
                 .thenReturn(List.of(firstMembership, secondMembership));
+        when(userMapper.toInfo(user)).thenReturn(userInfo);
         when(selectionTokenRepository.save(any(TenantSelectionToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(jwtService.generateTenantSelectionToken(eq(user), any(UUID.class)))
@@ -153,6 +163,7 @@ class AuthServiceTest {
         ));
 
         assertEquals(LoginStatus.TENANT_SELECTION_REQUIRED, response.status());
+        assertEquals(userInfo, response.user());
         assertNull(response.tokens());
         assertEquals("selection-token", response.tenantSelectionToken());
         assertEquals(300, response.tenantSelectionExpiresIn());
@@ -381,6 +392,16 @@ class AuthServiceTest {
                 .tenant(tenant)
                 .status(TenantMembershipStatus.ACTIVE)
                 .build();
+    }
+
+
+    private UserInfoResponse createUserInfo(User user) {
+
+        return new UserInfoResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail()
+        );
     }
 
 
