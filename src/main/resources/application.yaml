@@ -9,6 +9,10 @@ spring:
     default: dev
 
 nomion:
+  initial-setup:
+    enabled: ${INITIAL_SETUP_ENABLED:false}
+    token: ${INITIAL_SETUP_TOKEN:}
+
   security:
     jwt:
       secret: ${JWT_SECRET}

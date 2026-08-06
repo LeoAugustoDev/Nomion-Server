@@ -16,7 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, InitialSetupProperties.class})
 public class SecurityConfig {
 
     @Bean
@@ -40,7 +40,8 @@ public class SecurityConfig {
                                 "/auth/login",
                                 "/auth/select-tenant",
                                 "/auth/refresh",
-                                "/auth/logout"
+                                "/auth/logout",
+                                "/setup/initialize"
                         ).permitAll()
                         .requestMatchers(
                                 "/swagger-ui/**",

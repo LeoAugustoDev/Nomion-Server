@@ -21,6 +21,8 @@ import com.nomion.tenant.domain.TenantMembership;
 import com.nomion.tenant.mapper.TenantMembershipMapper;
 import com.nomion.tenant.service.TenantMembershipService;
 import com.nomion.user.domain.User;
+import com.nomion.user.dto.UserInfoResponse;
+import com.nomion.user.mapper.UserMapper;
 import com.nomion.user.repository.UserRepository;
 import io.jsonwebtoken.JwtException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,6 +52,7 @@ public class AuthService {
     private final TenantMembershipService membershipService;
     private final TenantMembershipMapper membershipMapper;
     private final AuthorizationService authorizationService;
+    private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -61,6 +64,7 @@ public class AuthService {
             TenantMembershipService membershipService,
             TenantMembershipMapper membershipMapper,
             AuthorizationService authorizationService,
+            UserMapper userMapper,
             PasswordEncoder passwordEncoder,
             JwtService jwtService
     ) {
@@ -70,6 +74,7 @@ public class AuthService {
         this.membershipService = membershipService;
         this.membershipMapper = membershipMapper;
         this.authorizationService = authorizationService;
+        this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -92,11 +97,14 @@ public class AuthService {
             throw new UnauthorizedException("Usuário não possui acesso ativo a nenhum tenant");
         }
 
+        UserInfoResponse userInfo = userMapper.toInfo(user);
+
         if (memberships.size() == 1) {
             TenantMembership membership = memberships.getFirst();
 
             return new LoginResponse(
                     LoginStatus.AUTHENTICATED,
+                    userInfo,
                     issueTokens(user, membership),
                     null,
                     0,
@@ -116,6 +124,7 @@ public class AuthService {
 
         return new LoginResponse(
                 LoginStatus.TENANT_SELECTION_REQUIRED,
+                userInfo,
                 null,
                 jwtService.generateTenantSelectionToken(user, selectionTokenId),
                 jwtService.getTenantSelectionTokenExpiration().toSeconds(),

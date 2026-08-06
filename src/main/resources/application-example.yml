@@ -21,3 +21,8 @@ logging:
   level:
     org.springframework.security: INFO
     org.hibernate.SQL: DEBUG
+
+nomion:
+  initial-setup:
+    enabled: ${INITIAL_SETUP_ENABLED:false}
+    token: ${INITIAL_SETUP_TOKEN:}
