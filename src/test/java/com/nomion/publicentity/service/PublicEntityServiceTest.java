@@ -50,6 +50,9 @@ class PublicEntityServiceTest {
     @Mock
     private PublicEntityMapper mapper;
 
+    @Mock
+    private PublicEntityDeactivationGuard deactivationGuard;
+
     @InjectMocks
     private PublicEntityService service;
 
@@ -122,7 +125,10 @@ class PublicEntityServiceTest {
 
         UUID entityId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
-        PublicEntity entity = PublicEntity.builder().id(entityId).build();
+        PublicEntity entity = PublicEntity.builder()
+                .id(entityId)
+                .active(true)
+                .build();
         UpdatePublicEntityRequest request = updateRequest();
         PublicEntityResponse response = response(entityId, false);
 
@@ -143,6 +149,7 @@ class PublicEntityServiceTest {
         ));
 
         verify(mapper).update(entity, request, "11222333000181");
+        verify(deactivationGuard).validate(tenantId, entityId);
     }
 
 

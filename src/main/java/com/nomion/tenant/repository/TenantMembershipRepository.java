@@ -28,4 +28,12 @@ public interface TenantMembershipRepository extends JpaRepository<TenantMembersh
 
 
     boolean existsByUser_IdAndTenant_Id(UUID userId, UUID tenantId);
+
+
+    @EntityGraph(attributePaths = {"user", "tenant"})
+    Optional<TenantMembership> findByIdAndTenant_IdAndStatus(
+            UUID id,
+            UUID tenantId,
+            TenantMembershipStatus status
+    );
 }

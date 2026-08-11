@@ -17,6 +17,9 @@ public interface PublicEntityRepository extends JpaRepository<PublicEntity, UUID
     Optional<PublicEntity> findByIdAndTenant_Id(UUID id, UUID tenantId);
 
 
+    Optional<PublicEntity> findByIdAndTenant_IdAndActiveTrue(UUID id, UUID tenantId);
+
+
     boolean existsByTenant_IdAndCnpj(UUID tenantId, String cnpj);
 
 

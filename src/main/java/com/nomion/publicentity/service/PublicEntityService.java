@@ -31,16 +31,19 @@ public class PublicEntityService {
     private final PublicEntityRepository repository;
     private final TenantRepository tenantRepository;
     private final PublicEntityMapper mapper;
+    private final PublicEntityDeactivationGuard deactivationGuard;
 
 
     public PublicEntityService(
             PublicEntityRepository repository,
             TenantRepository tenantRepository,
-            PublicEntityMapper mapper
+            PublicEntityMapper mapper,
+            PublicEntityDeactivationGuard deactivationGuard
     ) {
         this.repository = repository;
         this.tenantRepository = tenantRepository;
         this.mapper = mapper;
+        this.deactivationGuard = deactivationGuard;
     }
 
 
@@ -124,6 +127,11 @@ public class PublicEntityService {
         String cnpj = normalizeCnpj(request.cnpj());
 
         validateUniqueCnpj(tenantId, cnpj, id);
+
+        if (entity.isActive() && !request.active()) {
+            deactivationGuard.validate(tenantId, id);
+        }
+
         mapper.update(entity, request, cnpj);
 
         try {
