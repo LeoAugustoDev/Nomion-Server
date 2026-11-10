@@ -68,3 +68,17 @@ src/
 *The directory structure above represents the intended architectural organization and should be adjusted to match the actual source code.*
 
 ## Security
+
+### Keycloak for local development
+
+Set `KEYCLOAK_ADMIN_PASSWORD` in your local `.env` before the first start. Use `.env.example` for the variable names. Compose starts Keycloak on demand and keeps its development database in a separate named volume.
+
+```powershell
+docker compose up -d keycloak
+```
+
+Open the [Keycloak administration console](http://localhost:8081/admin/) with the configured bootstrap credentials. The default issuer is `http://localhost:8081/realms/nomion`. If the port is unavailable, set `KEYCLOAK_PORT` in `.env` and use that port in both URLs. For local login, create a user in the `nomion` realm and set its password in the console.
+
+The public client `nomion-angular` uses Authorization Code with PKCE S256 and redirects to `http://localhost:4200/`. Its access tokens include `nomion-api` in `aud`. The redirect and web origin must match the Angular development server.
+
+Startup imports the [versioned realm](docker/keycloak/nomion-realm.json) only if that realm is absent. To apply later configuration changes to an existing local realm, update it in the console. The bootstrap credentials also apply only on first initialization. See the [Keycloak realm import documentation](https://www.keycloak.org/server/importExport).
