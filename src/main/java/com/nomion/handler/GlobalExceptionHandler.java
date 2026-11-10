@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
@@ -119,6 +120,13 @@ public class GlobalExceptionHandler {
                 "Registro alterado por outra operação",
                 request
         );
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiError> handleResponseStatus(
+            ResponseStatusException exception, HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason(), request);
     }
 
     @ExceptionHandler(Exception.class)

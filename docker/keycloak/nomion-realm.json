@@ -2,6 +2,7 @@
   "realm": "nomion",
   "enabled": true,
   "registrationAllowed": false,
+  "duplicateEmailsAllowed": false,
   "clients": [
     {
       "clientId": "nomion-angular",

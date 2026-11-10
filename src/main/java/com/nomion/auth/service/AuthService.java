@@ -87,7 +87,7 @@ public class AuthService {
                 .orElseThrow(() ->
                         new UnauthorizedException("E-mail ou senha inválidos"));
 
-        if (!passwordEncoder.matches(request.password(), user.getPassword())) {
+        if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new UnauthorizedException("E-mail ou senha inválidos");
         }
 

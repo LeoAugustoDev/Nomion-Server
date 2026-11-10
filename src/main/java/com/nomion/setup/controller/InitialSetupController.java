@@ -4,6 +4,7 @@ import com.nomion.setup.dto.InitialSetupRequest;
 import com.nomion.setup.dto.InitialSetupResponse;
 import com.nomion.setup.service.InitialSetupService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import org.springframework.context.annotation.Profile;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Profile("!keycloak")
 @RequestMapping("/setup")
 public class InitialSetupController {
 

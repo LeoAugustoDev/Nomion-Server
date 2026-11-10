@@ -5,12 +5,13 @@ import com.nomion.handler.BusinessException;
 import com.nomion.handler.ResourceNotFoundException;
 import com.nomion.handler.UnauthorizedException;
 import com.nomion.setup.domain.InitialSetupState;
-import com.nomion.setup.dto.InitialAdminRequest;
 import com.nomion.setup.dto.InitialSetupRequest;
 import com.nomion.setup.dto.InitialSetupResponse;
+import com.nomion.setup.dto.KeycloakInitialSetupRequest;
 import com.nomion.setup.repository.InitialSetupStateRepository;
 import com.nomion.tenant.domain.Tenant;
 import com.nomion.tenant.domain.TenantMembership;
+import com.nomion.tenant.dto.CreateTenantRequest;
 import com.nomion.tenant.mapper.TenantMapper;
 import com.nomion.tenant.repository.TenantRepository;
 import com.nomion.tenant.service.TenantMembershipService;
@@ -21,14 +22,17 @@ import com.nomion.user.repository.UserRepository;
 import com.nomion.user.service.RoleAssignmentService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Service
 public class InitialSetupService {
@@ -81,7 +85,37 @@ public class InitialSetupService {
         validateAvailability();
         validateToken(providedToken);
         validatePassword(request.administrator().password());
+        String email = normalizeEmail(request.administrator().email());
+        return initialize(request.tenant(), email, () -> userMapper.toEntity(
+                request.administrator().name().trim(), email,
+                passwordEncoder.encode(request.administrator().password())
+        ));
+    }
 
+    @Transactional
+    public InitialSetupResponse initializeKeycloak(
+            String providedToken, KeycloakInitialSetupRequest request, Jwt token, String expectedSubject
+    ) {
+        validateAvailability();
+        validateToken(providedToken);
+        String email = token.getClaimAsString("email");
+        if (!StringUtils.hasText(expectedSubject) || !expectedSubject.equals(token.getSubject())
+                || token.getExpiresAt() == null || !"Bearer".equals(token.getClaims().get("typ"))
+                || !Boolean.TRUE.equals(token.getClaimAsBoolean("email_verified"))
+                || !StringUtils.hasText(email) || email.length() > 150) {
+            throw new UnauthorizedException("Identidade de setup inválida");
+        }
+
+        String normalizedEmail = normalizeEmail(email);
+        return initialize(request.tenant(), normalizedEmail, () -> User.builder()
+                .name(request.administratorName().trim())
+                .email(normalizedEmail)
+                .identityIssuer(token.getClaimAsString("iss"))
+                .identitySubject(token.getSubject())
+                .build());
+    }
+
+    private InitialSetupResponse initialize(CreateTenantRequest request, String email, Supplier<User> newUser) {
         InitialSetupState state = stateRepository.findByIdForUpdate(
                         InitialSetupState.SINGLETON_ID
                 )
@@ -92,12 +126,10 @@ public class InitialSetupService {
             throw new ResourceNotFoundException(SETUP_UNAVAILABLE_MESSAGE);
         }
 
-        String email = normalizeEmail(request.administrator().email());
-
-        validateUniqueData(request.tenant().slug(), email);
+        validateUniqueData(request.slug(), email);
 
         Tenant tenant = createTenant(request);
-        User administrator = createAdministrator(request.administrator(), email);
+        User administrator = createAdministrator(newUser.get());
         TenantMembership membership = membershipService.create(administrator, tenant);
 
         roleAssignmentService.assignTenantRoles(
@@ -164,11 +196,11 @@ public class InitialSetupService {
     }
 
 
-    private Tenant createTenant(InitialSetupRequest request) {
+    private Tenant createTenant(CreateTenantRequest request) {
 
         try {
             return tenantRepository.saveAndFlush(
-                    tenantMapper.toEntity(request.tenant())
+                    tenantMapper.toEntity(request)
             );
         } catch (DataIntegrityViolationException exception) {
             throw new BusinessException("Slug já utilizado");
@@ -176,16 +208,7 @@ public class InitialSetupService {
     }
 
 
-    private User createAdministrator(
-            InitialAdminRequest request,
-            String email
-    ) {
-
-        User administrator = userMapper.toEntity(
-                request.name().trim(),
-                email,
-                passwordEncoder.encode(request.password())
-        );
+    private User createAdministrator(User administrator) {
 
         try {
             return userRepository.saveAndFlush(administrator);
