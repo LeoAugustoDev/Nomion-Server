@@ -1,8 +1,11 @@
 package com.nomion.config;
 
 import com.nomion.security.JwtAuthenticationFilter;
+import com.nomion.security.AuthorizationService;
 import com.nomion.security.KeycloakAuthenticationConverter;
+import com.nomion.security.KeycloakTenantContextFilter;
 import com.nomion.security.RestAuthenticationEntryPoint;
+import com.nomion.tenant.service.TenantMembershipService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -15,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -58,12 +62,15 @@ public class SecurityConfig {
     public SecurityFilterChain keycloakSecurityFilterChain(
             HttpSecurity http,
             KeycloakAuthenticationConverter authenticationConverter,
-            RestAuthenticationEntryPoint authenticationEntryPoint
+            RestAuthenticationEntryPoint authenticationEntryPoint,
+            TenantMembershipService membershipService,
+            AuthorizationService authorizationService
     ) throws Exception {
 
         configureStatelessSecurity(http, authenticationEntryPoint)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**", "/setup/**").denyAll()
+                        .requestMatchers(HttpMethod.POST, "/users").denyAll()
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -75,6 +82,10 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(authenticationConverter))
+                )
+                .addFilterBefore(
+                        new KeycloakTenantContextFilter(membershipService, authorizationService),
+                        AuthorizationFilter.class
                 );
 
         return http.build();
