@@ -9,6 +9,7 @@ import com.nomion.tenant.service.TenantMembershipService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -19,6 +20,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableMethodSecurity
@@ -56,6 +59,22 @@ public class SecurityConfig {
         return http.build();
     }
 
+
+    @Bean
+    @Profile("keycloak")
+    @Order(1)
+    public SecurityFilterChain keycloakSetupSecurityFilterChain(
+            HttpSecurity http, RestAuthenticationEntryPoint authenticationEntryPoint
+    ) throws Exception {
+        return configureStatelessSecurity(http, authenticationEntryPoint)
+                .securityMatcher(PathPatternRequestMatcher.withDefaults()
+                        .matcher(HttpMethod.POST, "/setup/initialize"))
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .jwt(withDefaults()))
+                .build();
+    }
 
     @Bean
     @Profile("keycloak")

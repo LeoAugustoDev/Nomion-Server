@@ -9,6 +9,7 @@ import com.nomion.tenant.service.TenantMembershipService;
 import com.nomion.user.domain.RoleCode;
 import com.nomion.user.domain.User;
 import com.nomion.user.repository.UserRepository;
+import com.nomion.user.service.KeycloakAdminClient;
 import com.nomion.user.service.RoleAssignmentService;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -27,14 +28,19 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -48,8 +54,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "nomion.initial-setup.enabled=true",
+        "nomion.initial-setup.token=0123456789abcdef0123456789abcdef",
+        "INITIAL_SETUP_KEYCLOAK_SUBJECT=bootstrap-admin",
+        "spring.datasource.hikari.schema=nomion_test"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles({"dev", "keycloak"})
 @Import(KeycloakSecurityIntegrationTest.PrincipalProbe.class)
@@ -60,6 +78,7 @@ class KeycloakSecurityIntegrationTest {
     private static final String AUDIENCE = "nomion-api";
     private static final String PROBE = "/test/keycloak-principal";
     private static final String LOCAL_EMAIL = "keycloak-local@example.test";
+    private static final String SETUP_TOKEN = "0123456789abcdef0123456789abcdef";
     private static final RSAKey TRUSTED_KEY = createKey();
     private static HttpServer jwksServer;
 
@@ -80,6 +99,12 @@ class KeycloakSecurityIntegrationTest {
 
     @Autowired
     private RoleAssignmentService roleAssignmentService;
+
+    @Autowired
+    private JdbcClient database;
+
+    @MockitoBean
+    private KeycloakAdminClient keycloak;
 
     @DynamicPropertySource
     static void resourceServerProperties(DynamicPropertyRegistry registry) throws IOException {
@@ -131,8 +156,6 @@ class KeycloakSecurityIntegrationTest {
         mockMvc.perform(get("/contracts").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
         mockMvc.perform(post("/auth/logout").header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(post("/setup/initialize").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
     }
 
@@ -244,6 +267,88 @@ class KeycloakSecurityIntegrationTest {
                 .andExpect(jsonPath("$.user.memberships.length()").value(1));
     }
 
+    @Test
+    void shouldInitializeOnlyForTheConfiguredKeycloakAdministrator() throws Exception {
+        String payload = """
+                {"tenant":{"name":"Primeiro escritório","slug":"keycloak-inicial"},
+                 "administratorName":"Admin inicial"}
+                """;
+        Instant expiry = Instant.now().plusSeconds(300);
+        String admin = "Bearer " + sign(TRUSTED_KEY, ISSUER, "bootstrap-admin", AUDIENCE, expiry);
+        String other = "Bearer " + sign(TRUSTED_KEY, ISSUER, "another-user", AUDIENCE, expiry);
+
+        mockMvc.perform(post("/setup/initialize").header("X-Setup-Token", SETUP_TOKEN)
+                        .contentType("application/json").content(payload))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/setup/initialize").header("Authorization", other)
+                        .header("X-Setup-Token", SETUP_TOKEN).contentType("application/json").content(payload))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/setup/initialize").header("Authorization", admin)
+                        .header("X-Setup-Token", "incorrect").contentType("application/json").content(payload))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/setup/initialize").header("Authorization", admin)
+                        .header("X-Setup-Token", SETUP_TOKEN).contentType("application/json").content(payload))
+                .andExpect(status().isCreated());
+        mockMvc.perform(get("/me").header("Authorization", admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.memberships[0].tenantSlug").value("keycloak-inicial"));
+        mockMvc.perform(post("/setup/initialize").header("Authorization", admin)
+                        .header("X-Setup-Token", SETUP_TOKEN).contentType("application/json").content(payload))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void shouldRetryFailedEmailWithoutCreatingAnotherIdentityOrMembership() throws Exception {
+        String subject = UUID.randomUUID().toString();
+        String invitedSubject = UUID.randomUUID().toString();
+        String invitedEmail = "keycloak-invite@example.test";
+        UUID requestId = UUID.randomUUID();
+        User administrator = users.saveAndFlush(User.builder()
+                .name("Administrador").email(LOCAL_EMAIL)
+                .identityIssuer(ISSUER).identitySubject(subject).build());
+        Tenant tenant = tenants.saveAndFlush(Tenant.builder().name("Convites").slug("keycloak-convites").build());
+        try {
+            TenantMembership membership = membershipService.create(administrator, tenant);
+            roleAssignmentService.assignTenantRoles(membership, Set.of(RoleCode.TENANT_ADMIN), administrator);
+            when(keycloak.issuer()).thenReturn(ISSUER);
+            when(keycloak.ensureUser(any(), eq("Usuário convidado"), eq(invitedEmail))).thenReturn(invitedSubject);
+            doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE))
+                    .doNothing().when(keycloak).sendInvitation(invitedSubject);
+            String bearer = "Bearer " + sign(
+                    TRUSTED_KEY, ISSUER, subject, AUDIENCE, Instant.now().plusSeconds(300)
+            );
+            String payload = """
+                    {"name":"Usuário convidado","email":"keycloak-invite@example.test","roles":["VIEWER"]}
+                    """;
+            var invitation = post("/users/invitations")
+                    .header("Authorization", bearer).header("X-Tenant-Id", tenant.getId())
+                    .header("Idempotency-Key", requestId).contentType("application/json").content(payload);
+
+            mockMvc.perform(invitation).andExpect(status().isServiceUnavailable());
+            mockMvc.perform(invitation).andExpect(status().isNoContent());
+            mockMvc.perform(invitation).andExpect(status().isNoContent());
+            verify(keycloak, times(1)).ensureUser(any(), eq("Usuário convidado"), eq(invitedEmail));
+            verify(keycloak, times(2)).sendInvitation(invitedSubject);
+
+            String invitee = "Bearer " + sign(
+                    TRUSTED_KEY, ISSUER, invitedSubject, AUDIENCE, Instant.now().plusSeconds(300)
+            );
+            mockMvc.perform(get("/me").header("Authorization", invitee).header("X-Tenant-Id", tenant.getId()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.roles[0]").value("VIEWER"));
+        } finally {
+            database.sql("DELETE FROM user_invitations WHERE tenant_id = ?").param(tenant.getId()).update();
+            database.sql("""
+                    DELETE FROM membership_role_assignments WHERE membership_id IN
+                    (SELECT id FROM tenant_memberships WHERE tenant_id = ?)
+                    """).param(tenant.getId()).update();
+            database.sql("DELETE FROM tenant_memberships WHERE tenant_id = ?").param(tenant.getId()).update();
+            database.sql("DELETE FROM users WHERE email IN (?, ?)").params(LOCAL_EMAIL, invitedEmail).update();
+            tenants.deleteById(tenant.getId());
+        }
+    }
+
     private void reject(String token) throws Exception {
         mockMvc.perform(get(PROBE).header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized())
@@ -269,6 +374,7 @@ class KeycloakSecurityIntegrationTest {
                         .expirationTime(Date.from(expiresAt))
                         .claim("typ", "Bearer")
                         .claim("email", "different-keycloak-email@example.test")
+                        .claim("email_verified", true)
                         .claim("permissions", new String[]{"CONTRACT_READ"})
                         .build()
         );

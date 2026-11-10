@@ -90,6 +90,28 @@ $env:KEYCLOAK_ISSUER_URI = 'http://localhost:8081/realms/nomion'
 .\mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=dev,keycloak'
 ```
 
-The `keycloak` profile validates the issuer, signature, expiration and `nomion-api` audience. It requires a local user whose `identity_issuer` and `identity_subject` match the verified token. Legacy authentication, setup and password-based user creation are disabled in this profile. The existing `.env` and PostgreSQL configuration are still needed.
+The `keycloak` profile validates the issuer, signature, expiration and `nomion-api` audience. Regular API requests require a local user whose `identity_issuer` and `identity_subject` match the verified token. Login, refresh and logout use Keycloak in this profile.
 
 Call `GET /me` with the bearer token to get the local profile and active memberships in `user.memberships`. Send a single `X-Tenant-Id` header with the selected membership's `tenantId` on tenant requests. Calling `GET /me` with that header also returns `activeTenantId`, `roles` and `permissions` for the selected context. The API checks the active membership and loads permissions from the database on each request. An invalid header or unavailable membership returns HTTP 403.
+
+#### First administrator and invitations
+
+1. Create the first administrator in the `nomion` realm and verify the account's email. In `.env`, enable `INITIAL_SETUP_ENABLED`, set a random `INITIAL_SETUP_TOKEN` of at least 32 characters and set `INITIAL_SETUP_KEYCLOAK_SUBJECT` to the account's Keycloak user ID.
+2. With that account's access token, call `POST /setup/initialize` with `Authorization: Bearer …`, `X-Setup-Token` and the JSON body below. The setup uses the verified email in the token. After HTTP 201, disable the setup and remove its temporary credentials.
+
+```json
+{"tenant":{"name":"First office","slug":"first-office"},"administratorName":"First administrator"}
+```
+
+For invitations, configure SMTP in the realm. Create a confidential client `nomion-provisioning` with service accounts enabled and interactive flows disabled. Assign its service account the realm's `realm-management` client role `manage-users` and assign the built-in `kc-admin-api` scope to the client as a default scope. Set `KEYCLOAK_PROVISIONING_CLIENT_SECRET` in the backend environment. Set `KEYCLOAK_PROVISIONING_CLIENT_ID` if you chose a different client ID. [Keycloak Admin REST API audience requirements](https://www.keycloak.org/docs/26.8.2/upgrading/)
+
+An administrator with `USER_CREATE` and `ROLE_ASSIGN` can call `POST /users/invitations` with the selected `X-Tenant-Id`, an `Idempotency-Key` UUID, and JSON containing `name`, `email` and `roles`. The endpoint returns HTTP 204 after Keycloak accepts the invitation email request. On a transient failure, repeat the request with the same UUID and body. The user and membership are saved before email delivery is requested. An ambiguous email failure can result in a second email on retry, while the identity and membership are reused. For an existing local user, use the membership endpoint with that user's UUID.
+
+For an already initialized database, explicitly associate each existing user with the verified Keycloak issuer and subject while preserving their local UUID and memberships. At cutover, stop legacy instances before enabling the `keycloak` profile. In the application schema, revoke legacy refresh tokens and consume outstanding tenant selection tokens:
+
+```sql
+BEGIN;
+UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP, version = version + 1 WHERE revoked_at IS NULL;
+UPDATE tenant_selection_tokens SET consumed_at = CURRENT_TIMESTAMP, version = version + 1 WHERE consumed_at IS NULL;
+COMMIT;
+```

@@ -27,6 +27,7 @@ public class NomionUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String email) {
 
         return repository.findByEmailIgnoreCase(normalizeEmail(email))
+                .filter(user -> user.getPassword() != null)
                 .map(user -> new org.springframework.security.core.userdetails.User(
                         user.getEmail(),
                         user.getPassword(),

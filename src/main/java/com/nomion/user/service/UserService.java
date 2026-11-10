@@ -9,6 +9,7 @@ import com.nomion.tenant.domain.TenantMembership;
 import com.nomion.tenant.repository.TenantRepository;
 import com.nomion.tenant.service.TenantMembershipService;
 import com.nomion.user.domain.User;
+import com.nomion.user.domain.RoleCode;
 import com.nomion.user.dto.CreateUserRequest;
 import com.nomion.user.dto.CurrentUserResponse;
 import com.nomion.user.dto.UserResponse;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -69,17 +71,26 @@ public class UserService {
         }
 
 
-        Tenant tenant = tenantRepository.findById(authenticatedUser.tenantId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Tenant não encontrado"));
-
-
         User user = mapper.toEntity(
                 request.name().trim(),
                 email,
                 passwordEncoder.encode(request.password())
         );
 
+        return createWithMembership(user, request.roles(), authenticatedUser);
+    }
+
+    @Transactional
+    public UserResponse createInvitedUser(User user, Set<RoleCode> roles, AuthenticatedUser administrator) {
+        if (repository.existsByEmailIgnoreCase(user.getEmail())) {
+            throw new BusinessException("E-mail já utilizado");
+        }
+        return createWithMembership(user, roles, administrator);
+    }
+
+    private UserResponse createWithMembership(User user, Set<RoleCode> roles, AuthenticatedUser authenticatedUser) {
+        Tenant tenant = tenantRepository.findById(authenticatedUser.tenantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant não encontrado"));
         User savedUser;
 
         try {
@@ -93,7 +104,7 @@ public class UserService {
 
         roleAssignmentService.assignTenantRoles(
                 membership,
-                request.roles(),
+                roles,
                 assignedBy
         );
 
