@@ -1,0 +1,15 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f4f7f5;
+  color: #173328;
+  font-family: system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 3px solid #246ba0;
+  outline-offset: 3px;
+}

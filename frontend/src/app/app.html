@@ -1,0 +1,57 @@
+<header class="site-header">
+  <div class="header-inner">
+    <span class="brand"><span class="brand-mark" aria-hidden="true">N</span> Nomion</span>
+    @if (session.authenticated()) {
+      <button class="quiet" type="button" (click)="session.logout()">Sair</button>
+    }
+  </div>
+</header>
+
+<main>
+  <p class="eyebrow">Ambiente de trabalho</p>
+  <h1>{{ session.account() ? 'Olá, ' + session.account()?.name : 'Acesse o Nomion' }}</h1>
+
+  @if (session.error()) {
+    <p class="notice" role="alert">{{ session.error() }}</p>
+  }
+  @if (session.busy()) {
+    <p class="status" role="status">Carregando…</p>
+  }
+
+  @if (session.account(); as account) {
+    <section class="panel" aria-labelledby="office-heading">
+      <h2 id="office-heading">Escritório ativo</h2>
+      @if (account.memberships.length) {
+        <p>Escolha o escritório que deseja acessar.</p>
+        <label for="office">Escritório</label>
+        <select id="office" [value]="selectedOffice()?.tenantId ?? ''"
+                [disabled]="session.busy()" (change)="selectOffice($event)">
+          <option value="">Selecione um escritório</option>
+          @for (office of account.memberships; track office.tenantId) {
+            <option [value]="office.tenantId">{{ office.tenantName }}</option>
+          }
+        </select>
+      } @else {
+        <p>Seu usuário ainda não tem acesso a nenhum escritório.</p>
+      }
+      @if (session.error() || !account.memberships.length) {
+        <button class="quiet" type="button" [disabled]="session.busy()" (click)="session.loadProfile()">
+          Atualizar escritórios
+        </button>
+      }
+    </section>
+
+    @if (selectedOffice(); as office) {
+      <section class="panel context" aria-labelledby="context-heading">
+        <p class="eyebrow">Acesso confirmado</p>
+        <h2 id="context-heading">{{ office.tenantName }}</h2>
+        <p>Você está trabalhando neste escritório.</p>
+      </section>
+    }
+  } @else if (!session.busy() && session.authenticated()) {
+    <button type="button" (click)="session.loadProfile()">Tentar novamente</button>
+  } @else if (!session.busy() && session.ready()) {
+    <p>Entre com sua conta para acessar os escritórios vinculados a você.</p>
+    <button type="button" (click)="session.login()">Entrar</button>
+  }
+</main>
