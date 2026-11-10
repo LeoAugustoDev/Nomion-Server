@@ -82,3 +82,12 @@ Open the [Keycloak administration console](http://localhost:8081/admin/) with th
 The public client `nomion-angular` uses Authorization Code with PKCE S256 and redirects to `http://localhost:4200/`. Its access tokens include `nomion-api` in `aud`. The redirect and web origin must match the Angular development server.
 
 Startup imports the [versioned realm](docker/keycloak/nomion-realm.json) only if that realm is absent. To apply later configuration changes to an existing local realm, update it in the console. The bootstrap credentials also apply only on first initialization. See the [Keycloak realm import documentation](https://www.keycloak.org/server/importExport).
+
+To run the API with Keycloak token validation, set the issuer to match your local Keycloak port and activate both Spring profiles:
+
+```powershell
+$env:KEYCLOAK_ISSUER_URI = 'http://localhost:8081/realms/nomion'
+.\mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=dev,keycloak'
+```
+
+The `keycloak` profile validates the issuer, signature, expiration and `nomion-api` audience. It requires a local user whose `identity_issuer` and `identity_subject` match the verified token. The API authenticates that user with an empty tenant context until tenant selection and provisioning are implemented. The legacy setup and authentication endpoints are disabled in this profile. The existing `.env` and PostgreSQL configuration are still needed.
