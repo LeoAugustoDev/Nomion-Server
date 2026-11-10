@@ -10,6 +10,7 @@ import com.nomion.tenant.repository.TenantRepository;
 import com.nomion.tenant.service.TenantMembershipService;
 import com.nomion.user.domain.User;
 import com.nomion.user.dto.CreateUserRequest;
+import com.nomion.user.dto.CurrentUserResponse;
 import com.nomion.user.dto.UserResponse;
 import com.nomion.user.mapper.UserMapper;
 import com.nomion.user.repository.UserRepository;
@@ -121,6 +122,18 @@ public class UserService {
         return mapper.toResponse(user, List.of(membership));
     }
 
+
+    @Transactional(readOnly = true)
+    public CurrentUserResponse currentUser(AuthenticatedUser authenticatedUser) {
+        User user = repository.findById(authenticatedUser.id())
+                .orElseThrow(() -> new UnauthorizedException("Usuário não encontrado"));
+        UserResponse profile = mapper.toResponse(user, membershipService.findActiveByUser(user.getId()));
+
+        return new CurrentUserResponse(
+                profile, authenticatedUser.tenantId(),
+                authenticatedUser.roles(), authenticatedUser.permissions()
+        );
+    }
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);

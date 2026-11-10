@@ -90,4 +90,6 @@ $env:KEYCLOAK_ISSUER_URI = 'http://localhost:8081/realms/nomion'
 .\mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=dev,keycloak'
 ```
 
-The `keycloak` profile validates the issuer, signature, expiration and `nomion-api` audience. It requires a local user whose `identity_issuer` and `identity_subject` match the verified token. The API authenticates that user with an empty tenant context until tenant selection and provisioning are implemented. The legacy setup and authentication endpoints are disabled in this profile. The existing `.env` and PostgreSQL configuration are still needed.
+The `keycloak` profile validates the issuer, signature, expiration and `nomion-api` audience. It requires a local user whose `identity_issuer` and `identity_subject` match the verified token. Legacy authentication, setup and password-based user creation are disabled in this profile. The existing `.env` and PostgreSQL configuration are still needed.
+
+Call `GET /me` with the bearer token to get the local profile and active memberships in `user.memberships`. Send a single `X-Tenant-Id` header with the selected membership's `tenantId` on tenant requests. Calling `GET /me` with that header also returns `activeTenantId`, `roles` and `permissions` for the selected context. The API checks the active membership and loads permissions from the database on each request. An invalid header or unavailable membership returns HTTP 403.

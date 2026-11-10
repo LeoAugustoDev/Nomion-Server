@@ -1,7 +1,15 @@
 package com.nomion.security;
 
+import com.nomion.tenant.domain.Tenant;
+import com.nomion.tenant.domain.TenantMembership;
+import com.nomion.tenant.domain.TenantMembershipStatus;
+import com.nomion.tenant.repository.TenantMembershipRepository;
+import com.nomion.tenant.repository.TenantRepository;
+import com.nomion.tenant.service.TenantMembershipService;
+import com.nomion.user.domain.RoleCode;
 import com.nomion.user.domain.User;
 import com.nomion.user.repository.UserRepository;
+import com.nomion.user.service.RoleAssignmentService;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -33,6 +41,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -59,6 +68,18 @@ class KeycloakSecurityIntegrationTest {
 
     @Autowired
     private UserRepository users;
+
+    @Autowired
+    private TenantRepository tenants;
+
+    @Autowired
+    private TenantMembershipRepository memberships;
+
+    @Autowired
+    private TenantMembershipService membershipService;
+
+    @Autowired
+    private RoleAssignmentService roleAssignmentService;
 
     @DynamicPropertySource
     static void resourceServerProperties(DynamicPropertyRegistry registry) throws IOException {
@@ -143,6 +164,84 @@ class KeycloakSecurityIntegrationTest {
         reject(sign(TRUSTED_KEY, ISSUER, subject, "other-api", future));
         reject(sign(createKey(), ISSUER, subject, AUDIENCE, future));
         reject(sign(TRUSTED_KEY, ISSUER, subject, AUDIENCE, Instant.now().minusSeconds(300)));
+    }
+
+    @Test
+    void shouldSelectOnlyActiveMembershipsAndApplyTheirPermissionsOnEachRequest() throws Exception {
+        String subject = UUID.randomUUID().toString();
+        User user = users.saveAndFlush(User.builder()
+                .name("Local user")
+                .email(LOCAL_EMAIL)
+                .password("legacy-password-hash")
+                .identityIssuer(ISSUER)
+                .identitySubject(subject)
+                .build());
+        Tenant adminTenant = tenants.saveAndFlush(Tenant.builder().name("Alfa").slug("keycloak-alfa").build());
+        Tenant viewerTenant = tenants.saveAndFlush(Tenant.builder().name("Beta").slug("keycloak-beta").build());
+        TenantMembership admin = membershipService.create(user, adminTenant);
+        TenantMembership viewer = membershipService.create(user, viewerTenant);
+        roleAssignmentService.assignTenantRoles(admin, Set.of(RoleCode.TENANT_ADMIN), user);
+        roleAssignmentService.assignTenantRoles(viewer, Set.of(RoleCode.VIEWER), user);
+
+        String bearer = "Bearer " + sign(
+                TRUSTED_KEY, ISSUER, subject, AUDIENCE, Instant.now().plusSeconds(300)
+        );
+        String adminId = adminTenant.getId().toString();
+        String viewerId = viewerTenant.getId().toString();
+
+        mockMvc.perform(get("/me")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/me").header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value(user.getId().toString()))
+                .andExpect(jsonPath("$.user.memberships[0].tenantId").value(adminId))
+                .andExpect(jsonPath("$.user.memberships[1].tenantId").value(viewerId))
+                .andExpect(jsonPath("$.activeTenantId").isEmpty())
+                .andExpect(jsonPath("$.permissions").isEmpty());
+        mockMvc.perform(get("/me").header("Authorization", bearer).header("X-Tenant-Id", adminId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeTenantId").value(adminId))
+                .andExpect(jsonPath("$.roles[0]").value("TENANT_ADMIN"));
+        mockMvc.perform(get("/me").header("Authorization", bearer).header("X-Tenant-Id", viewerId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeTenantId").value(viewerId))
+                .andExpect(jsonPath("$.roles[0]").value("VIEWER"));
+        mockMvc.perform(get("/contracts").header("Authorization", bearer).header("X-Tenant-Id", viewerId))
+                .andExpect(status().isOk());
+        String contract = """
+                {
+                  "publicEntityId": "11111111-1111-1111-1111-111111111111",
+                  "number": "01/2026",
+                  "object": "Serviço de teste",
+                  "startDate": "2026-01-01",
+                  "endDate": "2026-12-31",
+                  "status": "DRAFT"
+                }
+                """;
+        mockMvc.perform(post("/contracts").header("Authorization", bearer).header("X-Tenant-Id", viewerId)
+                        .contentType("application/json").content(contract))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/contracts").header("Authorization", bearer).header("X-Tenant-Id", adminId)
+                        .contentType("application/json").content(contract))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/tenants/" + viewerId).header("Authorization", bearer).header("X-Tenant-Id", adminId))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/users").header("Authorization", bearer).header("X-Tenant-Id", adminId))
+                .andExpect(status().isForbidden());
+
+        for (String invalid : new String[]{UUID.randomUUID().toString(), "1-1-1-1-1"}) {
+            mockMvc.perform(get("/me").header("Authorization", bearer).header("X-Tenant-Id", invalid))
+                    .andExpect(status().isForbidden());
+        }
+        mockMvc.perform(get("/me").header("Authorization", bearer).header("X-Tenant-Id", adminId, viewerId))
+                .andExpect(status().isForbidden());
+
+        viewer.setStatus(TenantMembershipStatus.SUSPENDED);
+        memberships.saveAndFlush(viewer);
+        mockMvc.perform(get("/contracts").header("Authorization", bearer).header("X-Tenant-Id", viewerId))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/me").header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.memberships.length()").value(1));
     }
 
     private void reject(String token) throws Exception {
