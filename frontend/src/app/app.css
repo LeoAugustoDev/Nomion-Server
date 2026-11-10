@@ -3,8 +3,8 @@
 }
 
 .site-header {
-  border-bottom: 1px solid #dce5df;
-  background: #fff;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .header-inner {
@@ -18,6 +18,7 @@
 }
 
 .brand {
+  color: var(--gold);
   display: flex;
   align-items: center;
   gap: .65rem;
@@ -31,8 +32,8 @@
   width: 2rem;
   height: 2rem;
   border-radius: .45rem;
-  background: #164d39;
-  color: #fff;
+  background: var(--gold);
+  color: var(--background);
 }
 
 main {
@@ -43,7 +44,7 @@ main {
 
 .eyebrow {
   margin: 0;
-  color: #28614a;
+  color: var(--gold);
   font-size: .8rem;
   font-weight: 700;
   letter-spacing: .08em;
@@ -68,13 +69,13 @@ p {
 .panel {
   margin-block: 1rem;
   padding: 1.25rem;
-  border: 1px solid #dce5df;
+  border: 1px solid var(--border);
   border-radius: .75rem;
-  background: #fff;
+  background: var(--surface);
 }
 
 .context {
-  border-left: .3rem solid #287354;
+  border-left: .3rem solid var(--gold);
 }
 
 label, select {
@@ -90,19 +91,19 @@ select {
   width: min(100%, 25rem);
   min-height: 2.65rem;
   padding: .4rem .65rem;
-  border: 1px solid #73877d;
+  border: 1px solid var(--gold);
   border-radius: .35rem;
-  background: #fff;
+  background: var(--background);
   color: inherit;
   font: inherit;
 }
 
 button {
   padding: .6rem .9rem;
-  border: 1px solid #164d39;
+  border: 1px solid var(--gold);
   border-radius: .35rem;
-  background: #164d39;
-  color: #fff;
+  background: var(--gold);
+  color: var(--background);
   font: inherit;
   font-weight: 650;
   cursor: pointer;
@@ -115,7 +116,12 @@ button:disabled {
 
 .quiet {
   background: transparent;
-  color: #164d39;
+  color: var(--gold);
+}
+
+button:hover:not(:disabled) {
+  background: #edcf89;
+  color: var(--background);
 }
 
 .panel button {
@@ -124,6 +130,6 @@ button:disabled {
 
 .notice {
   padding: .65rem .85rem;
-  border-left: .25rem solid #af4e23;
-  background: #fff4ec;
+  border-left: .25rem solid var(--gold);
+  background: #2b2314;
 }
