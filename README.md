@@ -109,6 +109,17 @@ Call `GET /me` with the bearer token to get the local profile and active members
 
 For invitations, configure SMTP in the realm. Create a confidential client `nomion-provisioning` with service accounts enabled and interactive flows disabled. Assign its service account the realm's `realm-management` client role `manage-users` and assign the built-in `kc-admin-api` scope to the client as a default scope. Set `KEYCLOAK_PROVISIONING_CLIENT_SECRET` in the backend environment. Set `KEYCLOAK_PROVISIONING_CLIENT_ID` if you chose a different client ID. [Keycloak Admin REST API audience requirements](https://www.keycloak.org/docs/26.8.2/upgrading/)
 
+For local development on Windows, start the isolated email inbox and configure the existing realm:
+
+```powershell
+docker compose --profile identity --profile mail up -d keycloak mailpit
+.\docker\keycloak\configure-local-smtp.ps1
+```
+
+Open `http://localhost:8025` (or the port set by `MAILPIT_PORT`) to read invitation emails. Mailpit captures messages locally; it does not deliver them to real addresses. The configuration script replaces the realm's SMTP settings, so use it only for local development. For real delivery, configure your SMTP provider in Keycloak's Realm settings → Email and test it there. Existing realms retain their settings across restarts; reimporting the realm is not required. The Keycloak bootstrap administrator credentials in `.env` must match an existing master-realm administrator when running the script.
+
+The invitation link expires after 24 hours and requests both email verification and password setup. It does not yet provide a passwordless Google-only acceptance option or a way to resend an expired invitation; linking an existing identity must follow Keycloak's account verification flow.
+
 An administrator with `USER_CREATE` and `ROLE_ASSIGN` can call `POST /users/invitations` with the selected `X-Tenant-Id`, an `Idempotency-Key` UUID, and JSON containing `name`, `email` and `roles`. The endpoint returns HTTP 204 after Keycloak accepts the invitation email request. On a transient failure, repeat the request with the same UUID and body. The user and membership are saved before email delivery is requested. An ambiguous email failure can result in a second email on retry, while the identity and membership are reused. For an existing local user, use the membership endpoint with that user's UUID.
 
 For an already initialized database, explicitly associate each existing user with the verified Keycloak issuer and subject while preserving their local UUID and memberships. At cutover, stop legacy instances before enabling the `keycloak` profile. In the application schema, revoke legacy refresh tokens and consume outstanding tenant selection tokens:
