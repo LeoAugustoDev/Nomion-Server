@@ -1,57 +1,164 @@
-<header class="site-header">
-  <div class="header-inner">
-    <span class="brand"><span class="brand-mark" aria-hidden="true">N</span> Nomion</span>
-    @if (session.authenticated()) {
-      <button class="quiet" type="button" (click)="session.logout()">Sair</button>
+@if (session.context() && selectedOffice(); as office) {
+  <div class="app-shell">
+    <header class="mobile-header">
+      <span class="brand"><span class="brand-mark">N</span> Nomion</span>
+      <button
+        class="icon-button"
+        aria-label="Abrir menu"
+        [attr.aria-expanded]="menuOpen()"
+        (click)="menuOpen.set(!menuOpen())"
+      >
+        <app-icon name="menu" />
+      </button>
+    </header>
+    @if (menuOpen()) {
+      <button class="nav-backdrop" aria-label="Fechar menu" (click)="menuOpen.set(false)"></button>
     }
-  </div>
-</header>
+    <aside class="sidebar" [class.open]="menuOpen()" aria-label="Navegação principal">
+      <span class="brand"><span class="brand-mark">N</span> Nomion</span>
+      <button
+        class="office-switch"
+        (click)="session.loadProfile()"
+        aria-label="Trocar de escritório"
+      >
+        <span class="monogram">{{ initials(office.tenantName) }}</span>
+        <span class="office-title"
+          ><strong>{{ office.tenantName }}</strong
+          ><small>{{ role() }}</small></span
+        >
+        <app-icon name="switch" />
+      </button>
 
-<main>
-  <p class="eyebrow">Ambiente de trabalho</p>
-  <h1>{{ session.account() ? 'Olá, ' + session.account()?.name : 'Acesse o Nomion' }}</h1>
-
-  @if (session.error()) {
-    <p class="notice" role="alert">{{ session.error() }}</p>
-  }
-  @if (session.busy()) {
-    <p class="status" role="status">Carregando…</p>
-  }
-
-  @if (session.account(); as account) {
-    <section class="panel" aria-labelledby="office-heading">
-      <h2 id="office-heading">Escritório ativo</h2>
-      @if (account.memberships.length) {
-        <p>Escolha o escritório que deseja acessar.</p>
-        <label for="office">Escritório</label>
-        <select id="office" [value]="selectedOffice()?.tenantId ?? ''"
-                [disabled]="session.busy()" (change)="selectOffice($event)">
-          <option value="">Selecione um escritório</option>
-          @for (office of account.memberships; track office.tenantId) {
-            <option [value]="office.tenantId">{{ office.tenantName }}</option>
-          }
-        </select>
-      } @else {
-        <p>Seu usuário ainda não tem acesso a nenhum escritório.</p>
-      }
-      @if (session.error() || !account.memberships.length) {
-        <button class="quiet" type="button" [disabled]="session.busy()" (click)="session.loadProfile()">
-          Atualizar escritórios
+      <nav>
+        <p class="nav-label">Módulos</p>
+        @for (item of navigation; track item.page) {
+          <button
+            class="nav-item"
+            [class.active]="page() === item.page"
+            [attr.aria-current]="page() === item.page ? 'page' : null"
+            (click)="navigate(item.page)"
+          >
+            <app-icon [name]="item.icon" />{{ item.label }}
+          </button>
+        }
+        @for (item of upcoming; track item.label) {
+          <button class="nav-item future" disabled>
+            <app-icon [name]="item.icon" />{{ item.label }}<span class="soon">em breve</span>
+          </button>
+        }
+        <p class="nav-label office-label">Escritório</p>
+        <button class="nav-item" [class.active]="page() === 'team'" (click)="navigate('team')">
+          <app-icon name="users" />Equipe
         </button>
-      }
-    </section>
+        <button
+          class="nav-item"
+          [class.active]="page() === 'profile'"
+          (click)="navigate('profile')"
+        >
+          <app-icon name="user" />Meu perfil
+        </button>
+      </nav>
 
-    @if (selectedOffice(); as office) {
-      <section class="panel context" aria-labelledby="context-heading">
-        <p class="eyebrow">Acesso confirmado</p>
-        <h2 id="context-heading">{{ office.tenantName }}</h2>
-        <p>Você está trabalhando neste escritório.</p>
-      </section>
+      <div class="sidebar-user">
+        <span class="avatar">{{ initials(session.account()?.name ?? '') }}</span>
+        <span class="office-title"
+          ><strong>{{ session.account()?.name }}</strong
+          ><small>{{ session.account()?.email }}</small></span
+        >
+        <button class="icon-button" aria-label="Sair" (click)="session.logout()">
+          <app-icon name="exit" />
+        </button>
+      </div>
+    </aside>
+    <main class="workspace">
+      <app-workspace [page]="page()" (navigate)="navigate($event)" />
+    </main>
+  </div>
+} @else if (session.account(); as account) {
+  <header class="selection-header">
+    <span class="brand"><span class="brand-mark">N</span> Nomion</span>
+    <button class="text-button" (click)="session.logout()"><app-icon name="exit" />Sair</button>
+  </header>
+  <main class="office-selection">
+    <p class="eyebrow">Olá, {{ account.name }}</p>
+    <h1>Em qual escritório deseja trabalhar?</h1>
+    <p class="muted intro">
+      Cada escritório é um ambiente independente, com seus próprios órgãos, equipe e permissões.
+    </p>
+    @if (session.error()) {
+      <p class="notice" role="alert">{{ session.error() }}</p>
     }
-  } @else if (!session.busy() && session.authenticated()) {
-    <button type="button" (click)="session.loadProfile()">Tentar novamente</button>
-  } @else if (!session.busy() && session.ready()) {
-    <p>Entre com sua conta para acessar os escritórios vinculados a você.</p>
-    <button type="button" (click)="session.login()">Entrar</button>
-  }
-</main>
+    @if (session.busy()) {
+      <p role="status" class="muted">Carregando seu ambiente…</p>
+    }
+    <div class="office-cards" [attr.aria-busy]="session.busy()">
+      @for (office of account.memberships; track office.tenantId) {
+        <button
+          class="office-card"
+          [disabled]="session.busy()"
+          (click)="selectOffice(office.tenantId)"
+        >
+          <span class="monogram">{{ initials(office.tenantName) }}</span>
+          <span class="office-title"
+            ><strong>{{ office.tenantName }}</strong
+            ><small>Ambiente do escritório</small></span
+          >
+          <app-icon name="chevron" />
+        </button>
+      } @empty {
+        <div class="panel empty">
+          <app-icon name="building" />
+          <h2>Nenhum escritório disponível</h2>
+          <p>Solicite ao administrador o vínculo da sua conta a um escritório.</p>
+        </div>
+      }
+    </div>
+    @if (session.error() || !account.memberships.length) {
+      <button class="text-button" [disabled]="session.busy()" (click)="session.loadProfile()">
+        Atualizar escritórios
+      </button>
+    }
+  </main>
+} @else {
+  <main class="login-layout">
+    <section class="login-story">
+      <span class="brand"><span class="brand-mark">N</span> Nomion</span>
+      <div class="story-copy">
+        <p class="eyebrow">Direito público · Administração pública</p>
+        <h1>Rigor jurídico para quem <em>assessora o poder público.</em></h1>
+        <p>Contratos administrativos, órgãos e informações do seu escritório em um só ambiente.</p>
+      </div>
+      <small>© 2026 Nomion. Ambiente em desenvolvimento.</small>
+    </section>
+    <section class="login-access" aria-labelledby="login-heading">
+      <div class="login-content">
+        <span class="login-symbol"><app-icon name="shield" /></span>
+        <h2 id="login-heading">Entrar</h2>
+        <p class="muted">Acesse seu ambiente de trabalho com sua conta institucional.</p>
+        @if (session.error()) {
+          <p class="notice" role="alert">{{ session.error() }}</p>
+        }
+        @if (session.busy()) {
+          <p class="loading-line" role="status">
+            <span class="spinner"></span> Conectando ao seu ambiente…
+          </p>
+        } @else if (session.authenticated()) {
+          <button class="primary full-width" (click)="session.loadProfile()">
+            Tentar novamente
+          </button>
+          <button class="text-button full-width" (click)="session.logout()">Sair da conta</button>
+        } @else if (session.ready()) {
+          <button class="primary full-width" (click)="session.login()">
+            <app-icon name="shield" />Entrar com minha conta
+          </button>
+          <p class="login-note">Você será direcionado ao acesso seguro do Nomion.</p>
+        } @else {
+          <button class="primary full-width" (click)="reload()">Recarregar página</button>
+        }
+        <div class="login-footer">
+          <span class="gold-rule"></span><span>Gestão especializada em Direito Público</span>
+        </div>
+      </div>
+    </section>
+  </main>
+}

@@ -46,10 +46,12 @@ describe('Nomion session', () => {
     await Promise.resolve();
     await Promise.resolve();
     const request = http.expectOne('/api/me');
-    expect(adapter.init).toHaveBeenCalledWith(expect.objectContaining({
-      onLoad: 'check-sso',
-      pkceMethod: 'S256',
-    }));
+    expect(adapter.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onLoad: 'check-sso',
+        pkceMethod: 'S256',
+      }),
+    );
     expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
     expect(request.request.headers.has('X-Tenant-Id')).toBe(false);
     request.flush({ user, activeTenantId: null, roles: [], permissions: [] });
@@ -61,7 +63,10 @@ describe('Nomion session', () => {
     const initial = session.loadProfile('alpha');
     await Promise.resolve();
     http.expectOne('/api/me').flush({
-      user, activeTenantId: 'alpha', roles: ['TENANT_ADMIN'], permissions: ['CONTRACT_CREATE'],
+      user,
+      activeTenantId: 'alpha',
+      roles: ['TENANT_ADMIN'],
+      permissions: ['CONTRACT_CREATE'],
     });
     await initial;
     expect(session.context()?.permissions).toEqual(['CONTRACT_CREATE']);
@@ -77,7 +82,10 @@ describe('Nomion session', () => {
     next.flush({ user, activeTenantId: 'beta', roles: ['VIEWER'], permissions: ['CONTRACT_READ'] });
     await switching;
     previous.flush({
-      user, activeTenantId: 'alpha', roles: ['TENANT_ADMIN'], permissions: ['CONTRACT_CREATE'],
+      user,
+      activeTenantId: 'alpha',
+      roles: ['TENANT_ADMIN'],
+      permissions: ['CONTRACT_CREATE'],
     });
     await older;
     expect(session.context()?.activeTenantId).toBe('beta');
@@ -102,5 +110,52 @@ describe('Nomion session', () => {
     expect(session.account()).toBeNull();
     expect(session.context()).toBeNull();
     expect(adapter.logout).toHaveBeenCalledWith({ redirectUri: window.location.origin + '/' });
+  });
+
+  it('scopes API calls to the selected office and rejects a response after switching', async () => {
+    const selection = session.loadProfile('alpha');
+    await Promise.resolve();
+    http.expectOne('/api/me').flush({ user, activeTenantId: 'alpha', roles: [], permissions: [] });
+    await selection;
+    const pending = session.request('GET', '/public-entities');
+    const rejected = expect(pending).rejects.toThrow('O escritório ativo foi alterado.');
+    await Promise.resolve();
+    const request = http.expectOne('/api/public-entities');
+    expect(request.request.headers.get('X-Tenant-Id')).toBe('alpha');
+    expect(request.request.headers.get('Authorization')).toBe('Bearer access-token');
+    const switching = session.loadProfile('beta');
+    await Promise.resolve();
+    http.expectOne('/api/me').flush({ user, activeTenantId: 'beta', roles: [], permissions: [] });
+    await switching;
+    request.flush({ content: [{ name: 'Dados do escritório anterior' }] });
+    await rejected;
+    expect(session.context()?.activeTenantId).toBe('beta');
+  });
+
+  it('removes the active context when an operational request is forbidden', async () => {
+    const selection = session.loadProfile('alpha');
+    await Promise.resolve();
+    http.expectOne('/api/me').flush({ user, activeTenantId: 'alpha', roles: [], permissions: [] });
+    await selection;
+    const pending = session.request('GET', '/contracts');
+    const rejected = expect(pending).rejects.toBeDefined();
+    await Promise.resolve();
+    http.expectOne('/api/contracts').flush({}, { status: 403, statusText: 'Forbidden' });
+    await rejected;
+    expect(session.context()).toBeNull();
+    expect(session.error()).toContain('acesso foi alterado');
+  });
+
+  it('clears the session when token renewal fails before an API call', async () => {
+    const selection = session.loadProfile('alpha');
+    await Promise.resolve();
+    http.expectOne('/api/me').flush({ user, activeTenantId: 'alpha', roles: [], permissions: [] });
+    await selection;
+    adapter.updateToken.mockRejectedValueOnce(new Error('Refresh failed'));
+    await expect(session.request('GET', '/contracts')).rejects.toThrow('renovar sua sessão');
+    http.expectNone('/api/contracts');
+    expect(session.context()).toBeNull();
+    expect(session.account()).toBeNull();
+    expect(session.authenticated()).toBe(false);
   });
 });

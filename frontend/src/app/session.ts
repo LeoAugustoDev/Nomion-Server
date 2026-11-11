@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, InjectionToken, inject, signal } from '@angular/core';
 import Keycloak from 'keycloak-js';
 import { firstValueFrom } from 'rxjs';
@@ -133,14 +133,71 @@ export class Session {
     }
   }
 
+  async request<T>(
+    method: 'GET' | 'POST' | 'PUT',
+    path: string,
+    body?: unknown,
+    parameters: Record<string, string> = {},
+    additionalHeaders: Record<string, string> = {},
+  ): Promise<T> {
+    const context = this.contextState();
+    if (!context?.activeTenantId) {
+      throw new Error('Selecione um escritório para continuar.');
+    }
+    try {
+      await this.keycloak.updateToken(30);
+    } catch {
+      if (this.contextState() === context) this.clearSession();
+      throw new Error('Não foi possível renovar sua sessão.');
+    }
+    if (!this.keycloak.token) {
+      this.clearSession();
+      throw new Error('Sua sessão expirou.');
+    }
+    if (this.contextState() !== context) {
+      throw new Error('O escritório ativo foi alterado.');
+    }
+    try {
+      const result = await firstValueFrom(
+        this.http.request<T>(method, `/api${path}`, {
+          body,
+          headers: new HttpHeaders({
+            ...additionalHeaders,
+            Authorization: `Bearer ${this.keycloak.token}`,
+            'X-Tenant-Id': context.activeTenantId,
+          }),
+          params: new HttpParams({ fromObject: parameters }),
+        }),
+      );
+      if (this.contextState() !== context) {
+        throw new Error('O escritório ativo foi alterado.');
+      }
+      return result;
+    } catch (error) {
+      if (this.contextState() === context && error instanceof HttpErrorResponse) {
+        if (error.status === 401) {
+          this.clearSession();
+        } else if (error.status === 403) {
+          this.contextState.set(null);
+          this.errorState.set('Seu acesso foi alterado. Selecione novamente um escritório.');
+        }
+      }
+      throw error;
+    }
+  }
+
   private reportProfileError(error: unknown, tenantId?: string): void {
     if (!this.keycloak.token || !this.keycloak.authenticated) {
       this.clearSession();
     } else if (error instanceof HttpErrorResponse && error.status === 401) {
       this.accountState.set(null);
-      this.errorState.set('A API recusou a sessão. Verifique se sua conta está vinculada ao Nomion.');
+      this.errorState.set(
+        'A API recusou a sessão. Verifique se sua conta está vinculada ao Nomion.',
+      );
     } else if (tenantId && error instanceof HttpErrorResponse && error.status === 403) {
-      this.errorState.set('Seu acesso a esse escritório foi negado. Atualize a lista e selecione outro.');
+      this.errorState.set(
+        'Seu acesso a esse escritório foi negado. Atualize a lista e selecione outro.',
+      );
     } else {
       this.errorState.set('Não foi possível consultar o Nomion. Tente novamente.');
     }
