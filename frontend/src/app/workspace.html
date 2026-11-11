@@ -332,6 +332,15 @@
           </div>
         </form>
       </section>
+      <section class="panel form-panel">
+        <h2>Reenviar convite</h2>
+        <p class="muted">Envie um novo link para um convite ainda não concluído deste escritório.</p>
+        <form class="form-grid" (submit)="resendInvitation($event)">
+          <label class="wide">E-mail<input name="email" type="email" required maxlength="150" autocomplete="email" /></label>
+          @if (resendError()) { <p class="notice wide" role="alert">{{ resendError() }}</p> }
+          <div class="wide"><button class="secondary" [disabled]="saving()">Reenviar convite</button></div>
+        </form>
+      </section>
     } @else {
       <section class="panel empty">
         <app-icon name="users" />

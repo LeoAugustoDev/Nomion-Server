@@ -34,6 +34,13 @@ services:
       - ./docker/keycloak/nomion-realm.json:/opt/keycloak/data/import/nomion-realm.json:ro
       - ./docker/keycloak/themes/nomion:/opt/keycloak/themes/nomion:ro
 
+  mailpit:
+    image: axllent/mailpit:v1.27.8
+    profiles: [mail]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+
 volumes:
   nomion_postgres_data:
   nomion_keycloak_data:

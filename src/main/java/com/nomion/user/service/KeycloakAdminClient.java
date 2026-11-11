@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -92,11 +93,35 @@ public class KeycloakAdminClient {
     }
 
     public void sendInvitation(String subject) {
+        sendActions(subject, List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+    }
+
+    public void resendPendingInvitation(String subject) {
+        try {
+            String token = accessToken();
+            RemoteUser user = client.get().uri(usersEndpoint + "/{subject}", subject)
+                    .headers(headers -> headers.setBearerAuth(token)).retrieve().body(RemoteUser.class);
+            RemoteCredential[] credentials = client.get().uri(usersEndpoint + "/{subject}/credentials", subject)
+                    .headers(headers -> headers.setBearerAuth(token)).retrieve().body(RemoteCredential[].class);
+            if (user == null || credentials == null) throw unavailable();
+            var actions = new ArrayList<String>();
+            if (!user.emailVerified()) actions.add("VERIFY_EMAIL");
+            if (Arrays.stream(credentials).noneMatch(credential -> "password".equals(credential.type()))) {
+                actions.add("UPDATE_PASSWORD");
+            }
+            if (actions.isEmpty()) throw new BusinessException("Este convite já foi concluído");
+            sendActions(subject, actions);
+        } catch (RestClientException exception) {
+            throw unavailable();
+        }
+    }
+
+    private void sendActions(String subject, List<String> actions) {
         try {
             client.put().uri(usersEndpoint + "/{subject}/execute-actions-email?lifespan=86400", subject)
                     .headers(headers -> headers.setBearerAuth(accessToken()))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"))
+                    .body(actions)
                     .retrieve().toBodilessEntity();
         } catch (RestClientException exception) {
             throw unavailable();
@@ -136,5 +161,7 @@ public class KeycloakAdminClient {
 
     private record AdminToken(String access_token) {}
 
-    private record RemoteUser(String id, String username, String email) {}
+    private record RemoteUser(String id, String username, String email, boolean emailVerified) {}
+
+    private record RemoteCredential(String type) {}
 }

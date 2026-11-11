@@ -49,6 +49,7 @@ export class Workspace {
   protected readonly selectedContract = signal<Contract | null>(null);
   protected readonly saving = signal(false);
   protected readonly formError = signal('');
+  protected readonly resendError = signal('');
   protected readonly today = new Date();
   protected readonly types = entityTypes;
   protected readonly statuses = contractStatuses;
@@ -84,6 +85,7 @@ export class Workspace {
       this.listPage = 0;
       this.feedback.set('');
       this.formError.set('');
+      this.resendError.set('');
       this.invitationKey = null;
       void this.load();
     });
@@ -275,6 +277,25 @@ export class Workspace {
 
   protected resetInvitation(): void {
     this.invitationKey = null;
+  }
+
+  protected async resendInvitation(event: Event): Promise<void> {
+    event.preventDefault();
+    if (this.saving()) return;
+    const form = event.target as HTMLFormElement;
+    const email = String(new FormData(form).get('email'));
+    this.saving.set(true);
+    this.resendError.set('');
+    this.feedback.set('');
+    try {
+      await this.session.request('POST', '/users/invitations/resend', { email });
+      form.reset();
+      this.feedback.set('Convite reenviado. Confira o e-mail informado.');
+    } catch (error) {
+      this.resendError.set(errorMessage(error));
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   protected expired(contract: Contract): boolean {
