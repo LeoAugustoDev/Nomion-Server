@@ -115,3 +115,20 @@ UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP, version = version + 1 
 UPDATE tenant_selection_tokens SET consumed_at = CURRENT_TIMESTAMP, version = version + 1 WHERE consumed_at IS NULL;
 COMMIT;
 ```
+
+### Angular frontend
+
+The frontend runs at `http://localhost:4200/`. Start the API on port `8080` with the `dev,keycloak` profiles. Set up a linked Keycloak user with an active office membership before signing in.
+
+```powershell
+Set-Location frontend
+if (-not (Test-Path public/nomion-config.json)) {
+    Copy-Item nomion-config.example.json public/nomion-config.json
+}
+npm.cmd ci
+npm.cmd start
+```
+
+Set `keycloakUrl` in `public/nomion-config.json` to the Keycloak origin, using the same port as the backend issuer. The Angular development server proxies `/api/*` to Spring without the `/api` prefix. A deployed frontend needs the same route on its own origin and matching redirect, logout and web origin settings on the Keycloak client. The browser config is public.
+
+Run `npm.cmd test -- --watch=false` for the frontend tests and `npm.cmd run build` to produce the static files.
