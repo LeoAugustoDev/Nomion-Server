@@ -83,6 +83,10 @@ The public client `nomion-angular` uses Authorization Code with PKCE S256 and re
 
 Startup imports the [versioned realm](docker/keycloak/nomion-realm.json) only if that realm is absent. To apply later configuration changes to an existing local realm, update it in the console. The bootstrap credentials also apply only on first initialization. See the [Keycloak realm import documentation](https://www.keycloak.org/server/importExport).
 
+The Compose service mounts the `nomion` login theme from `docker/keycloak/themes/nomion`. Existing realms must select `nomion` under Realm settings → Themes → Login theme. The theme inherits Keycloak's forms and password visibility script. Its login template is based on the bundled Keycloak 26.8.2 template and should be reviewed when upgrading Keycloak.
+
+Google appears as a disabled option until an identity provider with alias `google` is configured. To enable it, create a Google OAuth web client with the redirect URI displayed in Keycloak's Google identity provider settings. Locally this is `http://localhost:8081/realms/nomion/broker/google/endpoint`, adjusted to your Keycloak port. Store the client ID and secret in the identity provider settings. For an existing Nomion user, link Google to that user's existing Keycloak identity so the subject and office memberships remain associated. [Google identity provider setup](https://www.keycloak.org/docs/26.8.0/server_admin/)
+
 To run the API with Keycloak token validation, set the issuer to match your local Keycloak port and activate both Spring profiles:
 
 ```powershell

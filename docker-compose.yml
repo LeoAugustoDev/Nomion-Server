@@ -30,6 +30,7 @@ services:
     volumes:
       - nomion_keycloak_data:/opt/keycloak/data
       - ./docker/keycloak/nomion-realm.json:/opt/keycloak/data/import/nomion-realm.json:ro
+      - ./docker/keycloak/themes/nomion:/opt/keycloak/themes/nomion:ro
 
 volumes:
   nomion_postgres_data:

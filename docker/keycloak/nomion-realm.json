@@ -3,6 +3,12 @@
   "enabled": true,
   "registrationAllowed": false,
   "duplicateEmailsAllowed": false,
+  "displayName": "Nomion",
+  "loginTheme": "nomion",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["pt-BR", "en"],
+  "defaultLocale": "pt-BR",
+  "rememberMe": true,
   "clients": [
     {
       "clientId": "nomion-angular",
