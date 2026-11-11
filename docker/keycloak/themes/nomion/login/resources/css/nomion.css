@@ -1,0 +1,353 @@
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/fraunces-latin-wght-normal.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: dark;
+  --nomion-background: #0c0c0c;
+  --nomion-surface: #161616;
+  --nomion-border: #51452b;
+  --nomion-gold: #d8b665;
+  --nomion-text: #f3eee3;
+  --nomion-muted: #bcb3a0;
+}
+
+html.login-pf,
+html.login-pf body {
+  min-height: 100%;
+  background: var(--nomion-background);
+  color: var(--nomion-text);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 14px;
+}
+
+body {
+  margin: 0;
+  background-image: none !important;
+}
+
+.login-pf-page {
+  width: min(100%, 528px);
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+.login-pf-page #kc-header {
+  margin: 0 0 56px;
+  padding: 0;
+  color: var(--nomion-gold);
+}
+
+#kc-header-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--nomion-gold);
+  padding: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font: 600 28px "Fraunces", Georgia, serif;
+}
+
+.nomion-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 7px;
+  background: linear-gradient(125deg, #f0d586, #bd9140);
+  color: #10100e;
+  font-size: 28px;
+}
+
+.login-pf-page .card-pf {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.login-pf-page .login-pf-header {
+  margin: 0 0 12px;
+  text-align: left;
+}
+
+#kc-page-title {
+  margin: 0;
+  color: var(--nomion-text);
+  text-align: left;
+  font: 600 clamp(26px, 5vw, 34px)/1.2 "Fraunces", Georgia, serif;
+}
+
+#kc-content .nomion-intro {
+  margin: 0 0 32px;
+  color: var(--nomion-muted);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+#kc-content,
+#kc-content-wrapper,
+#kc-form-wrapper {
+  margin: 0;
+  padding: 0;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.pf-c-form__label,
+label {
+  color: var(--nomion-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+input.pf-c-form-control,
+select.pf-c-form-control,
+textarea.pf-c-form-control {
+  min-height: 52px;
+  border: 1px solid var(--nomion-border);
+  border-radius: 10px;
+  background: var(--nomion-surface);
+  color: var(--nomion-text);
+  font: inherit;
+  padding: 12px 14px;
+  box-shadow: none;
+}
+
+.pf-c-form-control::after,
+.pf-c-input-group::after {
+  display: none;
+}
+
+.pf-c-input-group {
+  position: relative;
+  display: flex;
+  border: 0;
+  background: transparent;
+}
+
+.pf-c-input-group input {
+  padding-right: 52px;
+}
+
+.login-pf-page .pf-c-input-group button[data-password-toggle] {
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  z-index: 2;
+  width: 48px;
+  border: 0;
+  border-radius: 0 10px 10px 0;
+  background: var(--nomion-surface);
+  color: var(--nomion-muted);
+}
+
+.login-pf-page .pf-c-input-group button[data-password-toggle]::after {
+  border: 0;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--nomion-gold);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+.login-pf-page .login-pf-settings {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.checkbox {
+  margin: 0;
+}
+
+.checkbox label {
+  font-weight: 400;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--nomion-gold);
+}
+
+a,
+a:hover,
+a:focus {
+  color: var(--nomion-gold);
+}
+
+#kc-form-buttons {
+  margin: 0;
+}
+
+.pf-c-button.pf-m-primary,
+#kc-login {
+  min-height: 52px;
+  border: 1px solid var(--nomion-gold);
+  border-radius: 10px;
+  background: var(--nomion-gold);
+  color: #14120c;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.pf-c-button.pf-m-primary:hover,
+#kc-login:hover {
+  background: #edcf89;
+}
+
+.pf-c-button.pf-m-primary::after {
+  border: 0;
+}
+
+.nomion-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 28px 0 20px;
+  color: var(--nomion-muted);
+  font-size: 14px;
+}
+
+.nomion-divider::before,
+.nomion-divider::after {
+  flex: 1;
+  height: 1px;
+  background: var(--nomion-border);
+  content: "";
+}
+
+.nomion-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  border: 1px solid var(--nomion-border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--nomion-text);
+  font: 500 16px "IBM Plex Sans", system-ui, sans-serif;
+}
+
+a.nomion-google:hover {
+  background: #211e16;
+  color: var(--nomion-text);
+  text-decoration: none;
+}
+
+.nomion-google:disabled {
+  cursor: not-allowed;
+  color: var(--nomion-muted);
+}
+
+.nomion-google-mark {
+  color: var(--nomion-gold);
+  font: 700 22px system-ui, sans-serif;
+}
+
+.nomion-soon {
+  padding: 2px 6px;
+  border: 1px solid var(--nomion-border);
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+.nomion-disabled {
+  pointer-events: none;
+  opacity: .6;
+}
+
+.nomion-footer {
+  margin-top: 28px;
+  border-top: 1px solid var(--nomion-border);
+  text-align: center;
+  color: var(--nomion-muted);
+  font-size: 13px;
+}
+
+.login-pf-page .nomion-footer p {
+  margin: 24px 0 32px;
+  line-height: 1.6;
+  color: var(--nomion-muted);
+}
+
+.nomion-footer small {
+  font-size: 12px;
+}
+
+#input-error,
+.pf-m-error,
+.alert-error {
+  color: #f3aaa0;
+}
+
+.pf-c-alert {
+  margin-bottom: 24px;
+  border: 1px solid var(--nomion-border);
+  border-radius: 8px;
+  background: var(--nomion-surface);
+  color: var(--nomion-text);
+  box-shadow: none;
+}
+
+.login-pf-page #kc-info {
+  margin: 24px 0 0;
+  background: transparent;
+  color: var(--nomion-text);
+}
+
+.login-pf-page #kc-info-wrapper {
+  padding: 0;
+}
+
+#kc-locale {
+  display: none;
+}
+
+#kc-current-locale-link,
+#kc-locale-dropdown button,
+#kc-locale-dropdown ul {
+  background: var(--nomion-surface);
+  color: var(--nomion-text);
+  border-color: var(--nomion-border);
+}
+
+@media (max-width: 560px) {
+  .login-pf-page {
+    padding: 24px;
+  }
+
+  .login-pf-page #kc-header {
+    margin-bottom: 40px;
+  }
+
+  .login-pf-page .login-pf-settings {
+    flex-wrap: wrap;
+  }
+}

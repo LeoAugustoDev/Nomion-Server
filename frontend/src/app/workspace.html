@@ -1,0 +1,472 @@
+<div class="page-heading">
+  <div>
+    <p class="eyebrow">
+      {{
+        page() === 'overview'
+          ? 'Seu escritório'
+          : page() === 'profile' || page() === 'team'
+            ? 'Escritório'
+            : 'Cadastro'
+      }}
+    </p>
+    <h1>{{ title[page()] }}</h1>
+    <p class="muted">{{ description[page()] }}</p>
+  </div>
+  @if (page() === 'entities' && can('PUBLIC_ENTITY_CREATE')) {
+    <button class="primary" (click)="openEntity()"><app-icon name="plus" />Novo órgão</button>
+  }
+</div>
+
+@if (error()) {
+  <div class="notice" role="alert">
+    {{ error() }} <button class="text-button" (click)="load()">Tentar novamente</button>
+  </div>
+}
+@if (feedback()) {
+  <p class="notice success" role="status">{{ feedback() }}</p>
+}
+@if (loading()) {
+  <div class="loading-line" role="status">
+    <span class="spinner"></span> Consultando os dados do escritório…
+  </div>
+}
+
+@switch (page()) {
+  @case ('overview') {
+    @if (stats(); as totals) {
+      <div class="metrics">
+        <article class="metric">
+          <p>Órgãos atendidos <app-icon name="building" /></p>
+          <strong>{{ totals.entities === null ? '—' : (totals.entities | number) }}</strong
+          ><small>Cadastros do escritório</small>
+        </article>
+        <article class="metric">
+          <p>Órgãos ativos <app-icon name="building" /></p>
+          <strong>{{
+            totals.activeEntities === null ? '—' : (totals.activeEntities | number)
+          }}</strong
+          ><small>Em atendimento</small>
+        </article>
+        <article class="metric">
+          <p>Contratos cadastrados <app-icon name="file" /></p>
+          <strong>{{ totals.contracts === null ? '—' : (totals.contracts | number) }}</strong
+          ><small>Todos os registros</small>
+        </article>
+        <article class="metric">
+          <p>Contratos ativos <app-icon name="shield" /></p>
+          <strong>{{ totals.active === null ? '—' : (totals.active | number) }}</strong
+          ><small>Em execução</small>
+        </article>
+      </div>
+      <div class="dashboard-columns">
+        <section class="panel">
+          <div class="section-heading">
+            <h2>Contratos para acompanhar</h2>
+            <button class="text-button" (click)="navigate.emit('contracts')">Ver todos ↗</button>
+          </div>
+          <p class="muted caption">
+            Até cinco contratos ativos com vigência vencida ou a vencer nos próximos 60 dias.
+          </p>
+          @for (contract of attention(); track contract.id) {
+            <button class="attention-row" (click)="openContract(contract)">
+              <app-icon name="alert" />
+              <span
+                ><strong>{{ contract.number }} — {{ contract.object }}</strong
+                ><small>{{ contract.publicEntity.name }}</small></span
+              >
+              <span class="attention-date"
+                >{{ contract.endDate | date: 'dd/MM/yyyy'
+                }}<small [class.danger]="expired(contract)">{{
+                  expired(contract) ? 'Vigência vencida' : 'A vencer'
+                }}</small></span
+              >
+            </button>
+          } @empty {
+            <div class="empty compact">
+              <app-icon name="calendar" />
+              <p>
+                {{
+                  can('CONTRACT_READ')
+                    ? 'Nenhum contrato neste período.'
+                    : 'Consulta de contratos indisponível para seu perfil.'
+                }}
+              </p>
+            </div>
+          }
+        </section>
+        <section class="panel">
+          <h2>Seu ambiente de trabalho</h2>
+          <p class="muted">
+            Informações organizadas por escritório, com acesso conforme seu perfil.
+          </p>
+          <button class="quick-link" (click)="navigate.emit('entities')">
+            <app-icon name="building" /><span>Consultar órgãos públicos</span
+            ><app-icon name="chevron" />
+          </button>
+          <button class="quick-link" (click)="navigate.emit('contracts')">
+            <app-icon name="file" /><span>Acompanhar contratos</span><app-icon name="chevron" />
+          </button>
+          <button class="quick-link" (click)="navigate.emit('profile')">
+            <app-icon name="user" /><span>Meu perfil e permissões</span><app-icon name="chevron" />
+          </button>
+          <p class="caption muted updated">Consultado em {{ today | date: 'dd/MM/yyyy' }}</p>
+        </section>
+      </div>
+    }
+  }
+  @case ('entities') {
+    <form class="filters" (submit)="filter($event)">
+      <label class="search-field"
+        ><app-icon name="search" /><input
+          name="name"
+          aria-label="Buscar órgão por nome"
+          placeholder="Buscar órgão por nome"
+      /></label>
+      <input
+        name="municipality"
+        aria-label="Município"
+        placeholder="Município"
+        class="short-filter"
+      />
+      <select name="type" aria-label="Tipo de órgão">
+        <option value="">Todos os tipos</option>
+        @for (option of typeOptions; track option[0]) {
+          <option [value]="option[0]">{{ option[1] }}</option>
+        }
+      </select>
+      <select name="active" aria-label="Situação">
+        <option value="">Todas as situações</option>
+        <option value="true">Ativos</option>
+        <option value="false">Inativos</option>
+      </select>
+      <button class="secondary" [disabled]="loading()">Filtrar</button>
+    </form>
+    @if (entities(); as result) {
+      <div class="table-frame">
+        <table>
+          <thead>
+            <tr>
+              <th>Órgão</th>
+              <th>Tipo</th>
+              <th>Contato</th>
+              <th>Situação</th>
+              <th><span class="sr-only">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entity of result.content; track entity.id) {
+              <tr>
+                <td>
+                  <button class="table-link" (click)="openEntity(entity)">{{ entity.name }}</button
+                  ><small
+                    >{{ entity.municipality }}/{{ entity.state }} ·
+                    {{ entity.cnpj || 'CNPJ não informado' }}</small
+                  >
+                </td>
+                <td>{{ types[entity.type] }}</td>
+                <td>{{ entity.email || entity.phone || '—' }}</td>
+                <td>
+                  <span class="badge" [class.good]="entity.active">{{
+                    entity.active ? 'Ativo' : 'Inativo'
+                  }}</span>
+                </td>
+                <td>
+                  <button
+                    class="icon-button"
+                    [attr.aria-label]="'Ver ' + entity.name"
+                    (click)="openEntity(entity)"
+                  >
+                    <app-icon name="chevron" />
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5">
+                  <div class="empty">
+                    <app-icon name="building" />
+                    <h2>Nenhum órgão encontrado</h2>
+                    <p>Cadastre um órgão ou ajuste os filtros da consulta.</p>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span
+          >{{ result.totalElements }} registros · Página {{ result.page + 1 }} de
+          {{ result.totalPages || 1 }}</span
+        >
+        <div>
+          <button class="secondary" [disabled]="result.first" (click)="paginate(-1)">
+            Anterior</button
+          ><button class="secondary" [disabled]="result.last" (click)="paginate(1)">Próxima</button>
+        </div>
+      </div>
+    }
+  }
+  @case ('contracts') {
+    <form class="filters" (submit)="filter($event)">
+      <label class="search-field"
+        ><app-icon name="search" /><input
+          name="number"
+          aria-label="Buscar contrato por número"
+          placeholder="Buscar contrato por número"
+      /></label>
+      <select name="status" aria-label="Situação do contrato">
+        <option value="">Todas as situações</option>
+        @for (option of statusOptions; track option[0]) {
+          <option [value]="option[0]">{{ option[1] }}</option>
+        }
+      </select>
+      <button class="secondary" [disabled]="loading()">Filtrar</button>
+    </form>
+    @if (contracts(); as result) {
+      <div class="table-frame">
+        <table>
+          <thead>
+            <tr>
+              <th>Contrato</th>
+              <th>Órgão</th>
+              <th>Valor</th>
+              <th>Vigência até</th>
+              <th>Situação</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (contract of result.content; track contract.id) {
+              <tr>
+                <td>
+                  <button class="table-link" (click)="openContract(contract)">
+                    {{ contract.number }}</button
+                  ><small class="object-preview">{{ contract.object }}</small>
+                </td>
+                <td>{{ contract.publicEntity.name }}</td>
+                <td class="nowrap">
+                  {{ contract.amount === null ? '—' : (contract.amount | currency: 'BRL') }}
+                </td>
+                <td class="nowrap">{{ contract.endDate | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  <span class="badge" [class.good]="contract.status === 'ACTIVE'">{{
+                    statuses[contract.status]
+                  }}</span>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5">
+                  <div class="empty">
+                    <app-icon name="file" />
+                    <h2>Nenhum contrato encontrado</h2>
+                    <p>Os contratos deste escritório aparecerão aqui.</p>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span
+          >{{ result.totalElements }} registros · Página {{ result.page + 1 }} de
+          {{ result.totalPages || 1 }}</span
+        >
+        <div>
+          <button class="secondary" [disabled]="result.first" (click)="paginate(-1)">
+            Anterior</button
+          ><button class="secondary" [disabled]="result.last" (click)="paginate(1)">Próxima</button>
+        </div>
+      </div>
+    }
+  }
+  @case ('profile') {
+    <section class="panel profile-panel">
+      <h2>{{ session.account()?.name }}</h2>
+      <p class="muted">{{ session.account()?.email }}</p>
+      <hr />
+      <h3>Perfis neste escritório</h3>
+      <div class="badge-list">
+        @for (role of session.context()?.roles; track role) {
+          <span class="badge">{{ role }}</span>
+        }
+      </div>
+      <h3>Permissões de acesso</h3>
+      <div class="badge-list">
+        @for (permission of session.context()?.permissions; track permission) {
+          <span class="permission">{{ permission }}</span>
+        } @empty {
+          <p class="muted">Nenhuma permissão atribuída.</p>
+        }
+      </div>
+    </section>
+  }
+  @case ('team') {
+    @if (can('USER_CREATE') && can('ROLE_ASSIGN')) {
+      <section class="panel form-panel">
+        <h2>Convidar profissional</h2>
+        <p class="muted">O convite será enviado para o e-mail informado.</p>
+        <form class="form-grid" (submit)="invite($event)" (input)="resetInvitation()">
+          <label class="wide"
+            >Nome<input name="name" required minlength="3" maxlength="100" autocomplete="name"
+          /></label>
+          <label class="wide"
+            >E-mail<input name="email" type="email" required maxlength="150" autocomplete="email"
+          /></label>
+          <label class="wide"
+            >Perfil<select name="role">
+              <option value="VIEWER">Visualização</option>
+              <option value="ANALYST">Analista</option>
+              <option value="CONSULTANT">Consultor</option>
+              <option value="TENANT_ADMIN">Administrador</option>
+            </select></label
+          >
+          @if (formError()) {
+            <p class="notice wide" role="alert">{{ formError() }}</p>
+          }
+          <div class="wide">
+            <button class="primary" [disabled]="saving()">
+              {{ saving() ? 'Enviando…' : 'Enviar convite' }}
+            </button>
+          </div>
+        </form>
+      </section>
+    } @else {
+      <section class="panel empty">
+        <app-icon name="users" />
+        <h2>Acesso restrito</h2>
+        <p>A administração da equipe está disponível aos responsáveis pelo escritório.</p>
+      </section>
+    }
+  }
+}
+
+<dialog
+  #entityDialog
+  class="editor-dialog"
+  aria-labelledby="entity-title"
+  (cancel)="saving() && $event.preventDefault()"
+>
+  <div class="section-heading">
+    <h2 id="entity-title">{{ selectedEntity() ? 'Órgão público' : 'Novo órgão' }}</h2>
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="Fechar"
+      [disabled]="saving()"
+      (click)="entityDialog.close()"
+    >
+      <app-icon name="close" />
+    </button>
+  </div>
+  <form class="form-grid" (submit)="saveEntity($event)">
+    <fieldset
+      class="form-fields wide"
+      [disabled]="saving() || (!!selectedEntity() && !can('PUBLIC_ENTITY_UPDATE'))"
+    >
+      <label class="wide"
+        >Nome<input
+          name="name"
+          required
+          minlength="3"
+          maxlength="150"
+          [value]="selectedEntity()?.name ?? ''"
+          [readOnly]="!!selectedEntity() && !can('PUBLIC_ENTITY_UPDATE')"
+      /></label>
+      <label
+        >Tipo<select name="type" [value]="selectedEntity()?.type ?? 'CITY_HALL'">
+          @for (option of typeOptions; track option[0]) {
+            <option [value]="option[0]">{{ option[1] }}</option>
+          }
+        </select></label
+      >
+      <label>CNPJ<input name="cnpj" maxlength="18" [value]="selectedEntity()?.cnpj ?? ''" /></label>
+      <label
+        >Município<input
+          name="municipality"
+          required
+          minlength="2"
+          maxlength="120"
+          [value]="selectedEntity()?.municipality ?? ''"
+      /></label>
+      <label
+        >UF<input
+          name="state"
+          required
+          pattern="[a-zA-Z]{2}"
+          maxlength="2"
+          [value]="selectedEntity()?.state ?? ''"
+      /></label>
+      <label
+        >E-mail<input
+          name="email"
+          type="email"
+          maxlength="150"
+          [value]="selectedEntity()?.email ?? ''"
+      /></label>
+      <label
+        >Telefone<input name="phone" maxlength="30" [value]="selectedEntity()?.phone ?? ''"
+      /></label>
+      @if (selectedEntity()) {
+        <label class="wide"
+          >Situação<select name="active" [value]="selectedEntity()?.active ? 'true' : 'false'">
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select></label
+        >
+      }
+    </fieldset>
+    @if (formError()) {
+      <p class="notice wide" role="alert">{{ formError() }}</p>
+    }
+    <div class="dialog-actions wide">
+      <button type="button" class="secondary" [disabled]="saving()" (click)="entityDialog.close()">
+        Fechar
+      </button>
+      @if (can(selectedEntity() ? 'PUBLIC_ENTITY_UPDATE' : 'PUBLIC_ENTITY_CREATE')) {
+        <button class="primary" [disabled]="saving()">
+          {{ saving() ? 'Salvando…' : 'Salvar órgão' }}
+        </button>
+      }
+    </div>
+  </form>
+</dialog>
+
+<dialog #contractDialog class="editor-dialog" aria-labelledby="contract-title">
+  @if (selectedContract(); as contract) {
+    <div class="section-heading">
+      <h2 id="contract-title">Contrato {{ contract.number }}</h2>
+      <button
+        type="button"
+        class="icon-button"
+        aria-label="Fechar contrato"
+        (click)="contractDialog.close()"
+      >
+        <app-icon name="close" />
+      </button>
+    </div>
+    <p class="muted">{{ contract.publicEntity.name }}</p>
+    <p class="contract-object">{{ contract.object }}</p>
+    <dl class="detail-grid">
+      <div>
+        <dt>Situação</dt>
+        <dd>{{ statuses[contract.status] }}</dd>
+      </div>
+      <div>
+        <dt>Vigência até</dt>
+        <dd>{{ contract.endDate | date: 'dd/MM/yyyy' }}</dd>
+      </div>
+      <div>
+        <dt>Valor</dt>
+        <dd>
+          {{ contract.amount === null ? 'Não informado' : (contract.amount | currency: 'BRL') }}
+        </dd>
+      </div>
+      <div>
+        <dt>Responsável</dt>
+        <dd>{{ contract.manager?.name || 'Não informado' }}</dd>
+      </div>
+    </dl>
+  }
+</dialog>
