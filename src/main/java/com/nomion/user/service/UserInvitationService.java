@@ -99,6 +99,30 @@ public class UserInvitationService {
         });
     }
 
+    public void resend(String address, AuthenticatedUser administrator) {
+        UUID tenantId = administrator.tenantId();
+        if (tenantId == null) throw new AccessDeniedException("Selecione um escritório");
+        String email = address.trim().toLowerCase(Locale.ROOT);
+        transactions.executeWithoutResult(status -> {
+            UUID invitationId = database.sql("""
+                    SELECT i.id FROM user_invitations i
+                    JOIN tenant_memberships m ON m.tenant_id = i.tenant_id AND m.user_id = i.user_id
+                    WHERE i.tenant_id = ? AND i.email = ? AND m.status = 'ACTIVE' FOR UPDATE OF i
+                    """).params(tenantId, email).query(UUID.class).optional()
+                    .orElseThrow(() -> new BusinessException("Convite não encontrado neste escritório"));
+            UUID userId = database.sql("SELECT user_id FROM user_invitations WHERE id = ?")
+                    .param(invitationId).query(UUID.class).single();
+            User user = users.findById(userId)
+                    .orElseThrow(() -> new IllegalStateException("Usuário do convite não encontrado"));
+            if (!keycloak.issuer().equals(user.getIdentityIssuer()) || !email.equals(user.getEmail())) {
+                throw new BusinessException("Identidade atual não corresponde ao convite");
+            }
+            keycloak.resendPendingInvitation(user.getIdentitySubject());
+            database.sql("UPDATE user_invitations SET sent_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    .param(invitationId).update();
+        });
+    }
+
     private Invitation lockInvitation(UUID tenantId, UUID requestId) {
         return database.sql("""
                 SELECT id, email, name, roles, user_id, sent_at IS NOT NULL AS sent

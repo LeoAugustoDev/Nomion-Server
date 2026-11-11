@@ -337,6 +337,19 @@ class KeycloakSecurityIntegrationTest {
             mockMvc.perform(get("/me").header("Authorization", invitee).header("X-Tenant-Id", tenant.getId()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.roles[0]").value("VIEWER"));
+            var resend = post("/users/invitations/resend")
+                    .header("Authorization", bearer).header("X-Tenant-Id", tenant.getId())
+                    .contentType("application/json").content("{\"email\":\"" + invitedEmail + "\"}");
+            mockMvc.perform(resend).andExpect(status().isNoContent());
+            verify(keycloak).resendPendingInvitation(invitedSubject);
+            mockMvc.perform(post("/users/invitations/resend").header("Authorization", invitee)
+                            .header("X-Tenant-Id", tenant.getId()).contentType("application/json")
+                            .content("{\"email\":\"" + invitedEmail + "\"}"))
+                    .andExpect(status().isForbidden());
+            database.sql("UPDATE tenant_memberships SET status = 'REVOKED' WHERE tenant_id = ? AND user_id <> ?")
+                    .params(tenant.getId(), administrator.getId()).update();
+            mockMvc.perform(resend).andExpect(status().isBadRequest());
+            verify(keycloak, times(1)).resendPendingInvitation(invitedSubject);
         } finally {
             database.sql("DELETE FROM user_invitations WHERE tenant_id = ?").param(tenant.getId()).update();
             database.sql("""
