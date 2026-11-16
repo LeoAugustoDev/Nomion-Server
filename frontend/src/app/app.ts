@@ -4,6 +4,7 @@ import {
   computed,
   inject,
   OnInit,
+  HostListener,
   signal,
 } from '@angular/core';
 import { Session } from './session';
@@ -49,6 +50,11 @@ export class App implements OnInit {
 
   ngOnInit(): void {
     void this.session.initialize();
+  }
+
+  @HostListener('document:keydown.escape')
+  protected closeMenu(): void {
+    this.menuOpen.set(false);
   }
 
   protected initials(name: string): string {
