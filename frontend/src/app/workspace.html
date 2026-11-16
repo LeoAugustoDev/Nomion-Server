@@ -120,12 +120,12 @@
         ><app-icon name="search" /><input
           name="name"
           aria-label="Buscar órgão por nome"
-          placeholder="Buscar órgão por nome"
+          placeholder="Buscar órgão por nome…"
       /></label>
       <input
         name="municipality"
         aria-label="Município"
-        placeholder="Município"
+        placeholder="Município…"
         class="short-filter"
       />
       <select name="type" aria-label="Tipo de órgão">
@@ -142,7 +142,7 @@
       <button class="secondary" [disabled]="loading()">Filtrar</button>
     </form>
     @if (entities(); as result) {
-      <div class="table-frame">
+      <div class="table-frame" tabindex="0" role="region" aria-label="Lista de órgãos públicos, com rolagem horizontal">
         <table>
           <thead>
             <tr>
@@ -213,7 +213,7 @@
         ><app-icon name="search" /><input
           name="number"
           aria-label="Buscar contrato por número"
-          placeholder="Buscar contrato por número"
+          placeholder="Buscar contrato por número…"
       /></label>
       <select name="status" aria-label="Situação do contrato">
         <option value="">Todas as situações</option>
@@ -224,7 +224,7 @@
       <button class="secondary" [disabled]="loading()">Filtrar</button>
     </form>
     @if (contracts(); as result) {
-      <div class="table-frame">
+      <div class="table-frame" tabindex="0" role="region" aria-label="Lista de contratos, com rolagem horizontal">
         <table>
           <thead>
             <tr>
@@ -312,7 +312,7 @@
             >Nome<input name="name" required minlength="3" maxlength="100" autocomplete="name"
           /></label>
           <label class="wide"
-            >E-mail<input name="email" type="email" required maxlength="150" autocomplete="email"
+            >E-mail<input name="email" type="email" required maxlength="150" autocomplete="email" spellcheck="false"
           /></label>
           <label class="wide"
             >Perfil<select name="role">
@@ -336,7 +336,7 @@
         <h2>Reenviar convite</h2>
         <p class="muted">Envie um novo link para um convite ainda não concluído deste escritório.</p>
         <form class="form-grid" (submit)="resendInvitation($event)">
-          <label class="wide">E-mail<input name="email" type="email" required maxlength="150" autocomplete="email" /></label>
+          <label class="wide">E-mail<input name="email" type="email" required maxlength="150" autocomplete="email" spellcheck="false" /></label>
           @if (resendError()) { <p class="notice wide" role="alert">{{ resendError() }}</p> }
           <div class="wide"><button class="secondary" [disabled]="saving()">Reenviar convite</button></div>
         </form>
@@ -411,6 +411,8 @@
         >E-mail<input
           name="email"
           type="email"
+          autocomplete="email"
+          spellcheck="false"
           maxlength="150"
           [value]="selectedEntity()?.email ?? ''"
       /></label>

@@ -10,12 +10,12 @@
 :root {
   color-scheme: dark;
   --background: #0b0b0a;
-  --surface: #161615;
-  --border: #3a3323;
+  --surface: #171715;
+  --border: #39352c;
   --gold: #d8b665;
   --gold-tint: #29251b;
   --text: #f3eee3;
-  --muted: #bcb3a0;
+  --muted: #c0b8a8;
   --font-display: 'Fraunces Variable', Georgia, serif;
 }
 body {
@@ -25,6 +25,10 @@ body {
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
   font-size: 0.875rem;
 }
+html { scroll-behavior: smooth; }
+main:focus:not(:focus-visible) { outline: none; }
+button, a, input, select { touch-action: manipulation; }
+h1, h2, h3 { text-wrap: balance; }
 button,
 input,
 select {
@@ -69,7 +73,9 @@ small {
 button {
   transition:
     background 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.15s;
 }
 .primary,
 .secondary,
@@ -79,7 +85,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  min-height: 2.4rem;
+  min-height: 2.75rem;
   padding: 0.55rem 0.85rem;
   border: 1px solid transparent;
   border-radius: 0.35rem;
@@ -139,11 +145,12 @@ button {
   font-size: 0.75rem;
 }
 .panel {
-  padding: 1.3rem;
+  padding: 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.45rem;
+  border-radius: 0.55rem;
 }
+.form-panel + .form-panel { margin-top: 1rem; }
 .notice {
   display: flex;
   flex-wrap: wrap;
@@ -179,14 +186,15 @@ button {
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.8rem;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 .metric {
-  padding: 1rem;
+  min-width: 0;
+  padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 0.45rem;
-  background: var(--surface);
+  border-radius: 0.55rem;
+  background: linear-gradient(155deg, #1c1b17, var(--surface) 65%);
 }
 .metric p {
   display: flex;
@@ -205,6 +213,7 @@ button {
   margin-bottom: 0.35rem;
   font:
     700 2rem var(--font-display);
+  font-variant-numeric: tabular-nums;
 }
 .metric small {
   color: var(--muted);
@@ -336,6 +345,7 @@ select:focus {
 }
 .table-frame {
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
   border: 1px solid var(--border);
   border-radius: 0.45rem;
   background: var(--surface);
@@ -344,6 +354,7 @@ table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  font-variant-numeric: tabular-nums;
 }
 thead {
   color: var(--muted);
@@ -506,6 +517,7 @@ hr {
   border-radius: 0.6rem;
   background: var(--surface);
   color: var(--text);
+  overscroll-behavior: contain;
 }
 .editor-dialog::backdrop {
   background: #000b;
@@ -564,6 +576,7 @@ hr {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *,
   *::before,
   *::after {
@@ -598,9 +611,8 @@ hr {
   .detail-grid {
     grid-template-columns: 1fr;
   }
-  .attention-date {
-    display: none;
-  }
+  .attention-row { flex-wrap: wrap; }
+  .attention-date { margin-left: 2rem; text-align: left; }
   .metric {
     padding: 0.8rem;
   }

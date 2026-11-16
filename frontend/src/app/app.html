@@ -1,11 +1,13 @@
+<a class="skip-link" href="#conteudo-principal">Pular para o conteúdo principal</a>
 @if (session.context() && selectedOffice(); as office) {
   <div class="app-shell">
     <header class="mobile-header">
       <span class="brand"><span class="brand-mark">N</span> Nomion</span>
       <button
         class="icon-button"
-        aria-label="Abrir menu"
+        [attr.aria-label]="menuOpen() ? 'Fechar menu' : 'Abrir menu'"
         [attr.aria-expanded]="menuOpen()"
+        aria-controls="main-navigation"
         (click)="menuOpen.set(!menuOpen())"
       >
         <app-icon name="menu" />
@@ -14,7 +16,7 @@
     @if (menuOpen()) {
       <button class="nav-backdrop" aria-label="Fechar menu" (click)="menuOpen.set(false)"></button>
     }
-    <aside class="sidebar" [class.open]="menuOpen()" aria-label="Navegação principal">
+    <aside id="main-navigation" class="sidebar" [class.open]="menuOpen()" aria-label="Navegação principal">
       <span class="brand"><span class="brand-mark">N</span> Nomion</span>
       <button
         class="office-switch"
@@ -70,7 +72,7 @@
         </button>
       </div>
     </aside>
-    <main class="workspace">
+    <main id="conteudo-principal" class="workspace" tabindex="-1">
       <app-workspace [page]="page()" (navigate)="navigate($event)" />
     </main>
   </div>
@@ -79,7 +81,7 @@
     <span class="brand"><span class="brand-mark">N</span> Nomion</span>
     <button class="text-button" (click)="session.logout()"><app-icon name="exit" />Sair</button>
   </header>
-  <main class="office-selection">
+  <main id="conteudo-principal" class="office-selection" tabindex="-1">
     <p class="eyebrow">Olá, {{ account.name }}</p>
     <h1>Em qual escritório deseja trabalhar?</h1>
     <p class="muted intro">
@@ -120,7 +122,7 @@
     }
   </main>
 } @else {
-  <main class="login-layout">
+  <main id="conteudo-principal" class="login-layout" tabindex="-1">
     <section class="login-story">
       <span class="brand"><span class="brand-mark">N</span> Nomion</span>
       <div class="story-copy">
